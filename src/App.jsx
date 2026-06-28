@@ -1,7 +1,9 @@
+import Cart from './pages/Cart'
+import Checkout from './pages/Checkout'
 import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
-import { LogOut, LogIn, Store, Shield, Home as HomeIcon, Menu, X } from 'lucide-react'
+import { LogOut, LogIn, Store, Shield, Home as HomeIcon, Menu, X, ShoppingCart, Truck } from 'lucide-react'
 
 import Home from './pages/Home'
 import Login from './pages/Login'
@@ -105,6 +107,7 @@ function App() {
 
           <main className="relative">
             <Routes>
+              
               <Route path="/" element={<Home />} />
               <Route path="/login" element={!session ? <Login /> : <Navigate to="/" replace />} />
               <Route path="/shop/:id" element={<ShopPage />} />
@@ -124,6 +127,9 @@ function App() {
                     : <Navigate to="/" replace />
                 }
               />
+              <Route path="/cart" element={<Cart />} />
+<Route path="/checkout" element={<Checkout />} />
+
             </Routes>
           </main>
 
@@ -212,6 +218,11 @@ function Navbar({ session, profile, handleLogout, mobileMenuOpen, setMobileMenuO
 
           <div className="hidden md:flex items-center gap-2">
             <NavLink to="/" icon={HomeIcon}>الرئيسية</NavLink>
+            <NavLink to="/cart" icon={ShoppingCart}>
+  السلة
+</NavLink>
+
+
 
             {profile?.role === 'admin' && (
               <NavLink to="/admin" icon={Shield}>لوحة الأدمن</NavLink>

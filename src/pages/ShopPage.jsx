@@ -7,7 +7,7 @@ export default function ShopPage() {
 
   const [shop, setShop] = useState(null)
   const [products, setProducts] = useState([])
-
+const [cart, setCart] = useState([]);
   useEffect(() => {
     loadShop()
     loadProducts()
@@ -32,7 +32,27 @@ export default function ShopPage() {
 
     setProducts(data || [])
   }
+function addToCart(product) {
+  const oldCart = JSON.parse(localStorage.getItem("cart") || "[]");
 
+  const found = oldCart.find((p) => p.id === product.id);
+
+  if (found) {
+    found.quantity += 1;
+  } else {
+    oldCart.push({
+      ...product,
+      quantity: 1,
+      shop_id: id,
+    });
+  }
+
+  localStorage.setItem("cart", JSON.stringify(oldCart));
+
+  setCart(oldCart);
+
+  alert("✅ تم إضافة المنتج إلى السلة");
+}
   if (!shop) {
     return (
       <div className="p-10 text-center">
@@ -96,8 +116,15 @@ export default function ShopPage() {
               </p>
 
               <div className="mt-4 font-bold text-emerald-600">
-                {product.price} ج.م
-              </div>
+  {product.price} ج.م
+</div>
+
+<button
+  onClick={() => addToCart(product)}
+  className="w-full mt-4 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold hover:scale-105 transition"
+>
+  🛒 أضف للسلة
+</button>
 
             </div>
 
