@@ -127,7 +127,7 @@ function App() {
                     : <Navigate to="/" replace />
                 }
               />
-              <Route path="/cart" element={<Cart />} />
+              <Route path="/Cart" element={<Cart />} />
 <Route path="/checkout" element={<Checkout />} />
 
             </Routes>
@@ -218,7 +218,7 @@ function Navbar({ session, profile, handleLogout, mobileMenuOpen, setMobileMenuO
 
           <div className="hidden md:flex items-center gap-2">
             <NavLink to="/" icon={HomeIcon}>الرئيسية</NavLink>
-            <NavLink to="/cart" icon={ShoppingCart}>
+            <NavLink to="/Cart" icon={ShoppingCart}>
   السلة
 </NavLink>
 
