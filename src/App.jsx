@@ -106,34 +106,20 @@ function App() {
           />
 
           <main className="relative">
-            <Routes>
-              
-              <Route path="/" element={<Home />} />
-              <Route path="/login" element={!session ? <Login /> : <Navigate to="/" replace />} />
-              <Route path="/shop/:id" element={<ShopPage />} />
-              <Route
-                path="/admin"
-                element={
-                  profile?.role === 'admin'
-                    ? <AdminDashboard profile={profile} />
-                    : <Navigate to="/" replace />
-                }
-              />
-              <Route
-                path="/shop-dashboard"
-                element={
-                  profile?.role === 'shop_owner'
-                    ? <ShopDashboard profile={profile} />
-                    : <Navigate to="/" replace />
-                }
-              />
-              <Route path="/Cart" element={<Cart />} />
-              <Route path="/Checkout" element={<Checkout />} />
+  <Routes>
+    ...
+  </Routes>
+</main>
 
-            </Routes>
-          </main>
+{/* زر السلة للموبايل */}
+<Link
+  to="/Cart"
+  className="fixed bottom-5 left-5 z-50 md:hidden bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-all"
+>
+  <ShoppingCart size={24} />
+</Link>
 
-          <footer className="relative mt-20 border-t border-white/10 bg-black/20 backdrop-blur-xl">
+<footer className="relative mt-20 border-t border-white/10 bg-black/20 backdrop-blur-xl">
             <div className="max-w-7xl mx-auto px-4 py-8">
               <div className="text-center">
                 <p className="text-white/60 text-sm">
@@ -272,7 +258,9 @@ function Navbar({ session, profile, handleLogout, mobileMenuOpen, setMobileMenuO
         {mobileMenuOpen && (
           <div className="md:hidden py-4 space-y-2 border-t border-white/10 animate-in slide-in-from-top duration-300">
             <NavLink to="/" icon={HomeIcon}>الرئيسية</NavLink>
-            
+            <NavLink to="/Cart" icon={ShoppingCart}>
+  السلة
+</NavLink>
             {profile?.role === 'admin' && (
               <NavLink to="/admin" icon={Shield}>لوحة الأدمن</NavLink>
             )}
