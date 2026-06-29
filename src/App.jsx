@@ -128,7 +128,7 @@ function App() {
                 }
               />
               <Route path="/Cart" element={<Cart />} />
-<Route path="/checkout" element={<Checkout />} />
+<Route path="/Checkout" element={<Checkout />} />
 
             </Routes>
           </main>

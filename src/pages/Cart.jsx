@@ -142,7 +142,7 @@ export default function Cart() {
         </h2>
 
         <Link
-          to="/checkout"
+          to="/Checkout"
           className="block mt-6 text-center bg-gradient-to-r from-green-600 to-emerald-500 text-white py-4 rounded-xl text-xl font-bold"
         >
          const phone = form.phone.trim();  
