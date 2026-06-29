@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { Store, MapPin, Star, TrendingUp, Sparkles } from 'lucide-react'
+import { Store, MapPin, Star, TrendingUp, Sparkles, ShoppingCart } from 'lucide-react'
 
 export default function Home() {
   const [shops, setShops] = useState([])
@@ -161,8 +161,15 @@ export default function Home() {
             ))}
           </div>
         )}
-      </div>
 
+      </div>
+{/* زر السلة الثابت للموبايل */}
+<Link
+  to="/Cart"
+  className="fixed bottom-6 left-6 z-50 md:hidden w-16 h-16 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all duration-300"
+>
+  <ShoppingCart size={28} />
+</Link>
       <style jsx>{`
         @keyframes gradient {
           0% { background-position: 0% 50%; }
