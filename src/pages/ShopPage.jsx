@@ -3,6 +3,43 @@ import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 export default function ShopPage() {
+  function addToCart(product) {
+
+  let cart =
+    JSON.parse(localStorage.getItem("cart") || "[]");
+
+  const index = cart.findIndex(
+    (p) => p.id === product.id
+  );
+
+  if (index > -1) {
+
+    cart[index].quantity += 1;
+
+  } else {
+
+    cart.push({
+
+      ...product,
+
+      quantity: 1,
+
+      shop_id: shop.id,
+      shop_name: shop.name,
+      shop_phone: shop.phone,
+      shop_address: shop.address
+
+    });
+
+  }
+
+  localStorage.setItem(
+    "cart",
+    JSON.stringify(cart)
+  );
+
+  alert("تمت إضافة المنتج إلى السلة");
+}
   const { id } = useParams()
 
   const [shop, setShop] = useState(null)
@@ -104,29 +141,28 @@ function addToCart(product) {
               alt={product.name}
               className="w-full h-52 object-cover"
             />
+<div className="p-4">
 
-            <div className="p-4">
+  <h3 className="font-bold text-lg">
+    {product.name}
+  </h3>
 
-              <h3 className="font-bold text-lg">
-                {product.name}
-              </h3>
+  <p className="text-gray-500 text-sm mt-2">
+    {product.description}
+  </p>
 
-              <p className="text-gray-500 text-sm mt-2">
-                {product.description}
-              </p>
+  <div className="mt-4 font-bold text-emerald-600">
+    {product.price} ج.م
+  </div>
 
-              <div className="mt-4 font-bold text-emerald-600">
-  {product.price} ج.م
+  <button
+    onClick={() => addToCart(product)}
+    className="w-full mt-5 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold"
+  >
+    🛒 أضف إلى السلة
+  </button>
+
 </div>
-
-<button
-  onClick={() => addToCart(product)}
-  className="w-full mt-4 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold hover:scale-105 transition"
->
-  🛒 أضف للسلة
-</button>
-
-            </div>
 
           </div>
 

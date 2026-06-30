@@ -11,18 +11,18 @@ export default function Checkout() {
 
   function handleChange(e) {
     setForm({
-      ...form,
+     ...form,
       [e.target.name]: e.target.value,
     });
   }
 
-async function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
 
     if (
-      !form.name.trim() ||
-      !form.phone.trim() ||
-      !form.address.trim()
+     !form.name.trim() ||
+     !form.phone.trim() ||
+     !form.address.trim()
     ) {
       alert("من فضلك أكمل جميع البيانات المطلوبة");
       return;
@@ -36,48 +36,68 @@ async function handleSubmit(e) {
       return;
     }
 
-const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+    // نجيب السلة هنا بعد التحقق من البيانات
+    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
 
-if (cart.length === 0) {
-  alert("السلة فارغة");
-  return;
-}
+    if (cart.length === 0) {
+      alert("السلة فارغة");
+      return;
+    }
 
-const total = cart.reduce(
-  (sum, item) => sum + Number(item.price) * item.quantity,
-  0
-);
+    const firstItem = cart[0];
 
-const orderNumber =
-  "FAQ" + Date.now().toString().slice(-8);
+    const items = cart.map(item => ({
+      product_id: item.id,
+      product_name: item.name,
+      product_image: item.images?.[0] || "",
+      quantity: item.quantity,
+      price: item.price,
+      shop_id: item.shop_id,
+      shop_name: item.shop_name,
+      shop_phone: item.shop_phone,
+      shop_address: item.shop_address
+    }));
 
-const { error } = await supabase
-  .from("orders")
-  .insert({
-    order_number: orderNumber,
-    customer_name: form.name,
-    customer_phone: form.phone,
-    customer_address: form.address,
-    notes: form.notes,
-    items: cart,
-    subtotal: total,
-    total: total,
-    status: "جديد",
-    payment_method: "كاش",
-    payment_status: "غير مدفوع",
-  });
+    const total = cart.reduce(
+      (sum, item) => sum + Number(item.price) * item.quantity,
+      0
+    );
 
-if (error) {
-  console.log(error);
-  alert("حدث خطأ أثناء حفظ الطلب");
-  return;
-}
+    const orderNumber = "FAQ" + Date.now().toString().slice(-8);
 
-localStorage.removeItem("cart");
+    const { error } = await supabase
+   .from("orders")
+   .insert({
+        order_number: orderNumber,
+        customer_name: form.name,
+        customer_phone: form.phone,
+        customer_address: form.address,
+        notes: form.notes,
 
-alert("تم إرسال الطلب بنجاح\nرقم الطلب: " + orderNumber);
+        shop_id: firstItem.shop_id,
+        shop_name: firstItem.shop_name,
+        shop_phone: firstItem.shop_phone,
+        shop_address: firstItem.shop_address,
 
-window.location.href = "/";
+        items: items,
+        subtotal: total,
+        total: total,
+        status: "جديد",
+        payment_method: "كاش",
+        payment_status: "غير مدفوع",
+      });
+
+    if (error) {
+      console.log(error);
+      alert("حدث خطأ أثناء حفظ الطلب");
+      return;
+    }
+
+    localStorage.removeItem("cart");
+
+    alert("تم إرسال الطلب بنجاح\nرقم الطلب: " + orderNumber);
+
+    window.location.href = "/";
   }
 
   return (
@@ -109,7 +129,7 @@ window.location.href = "/";
             onChange={(e) => {
               const value = e.target.value.replace(/\D/g, "");
               setForm({
-                ...form,
+               ...form,
                 phone: value,
               });
             }}
@@ -136,7 +156,7 @@ window.location.href = "/";
 
           <button
             type="submit"
-            className="w-full py-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-lg"
+            className="w-full py-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-lg hover:scale-105 transition-transform"
           >
             تأكيد الطلب
           </button>

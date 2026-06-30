@@ -4,7 +4,7 @@ import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from 'react
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
 import { LogOut, LogIn, Store, Shield, Home as HomeIcon, Menu, X, ShoppingCart, Truck } from 'lucide-react'
-
+import DeliveryDashboard from "./pages/DeliveryDashboard";
 import Home from './pages/Home.jsx'
 import Login from './pages/Login.jsx'
 import AdminDashboard from './pages/AdminDashboard.jsx'
@@ -129,8 +129,10 @@ function App() {
               />
               <Route path="/Cart" element={<Cart />} />
               <Route path="/Checkout" element={<Checkout />} />
-
-            </Routes>
+<Route
+  path="/delivery"
+  element={<DeliveryDashboard />}
+/>          </Routes>
           </main>
 <main className="relative">
   <Routes>
