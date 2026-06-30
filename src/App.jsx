@@ -3,7 +3,7 @@ import Checkout from './pages/Checkout.jsx'
 import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
-import { LogOut, LogIn, Store, Shield, Home as HomeIcon, Menu, X, ShoppingCart, Truck } from 'lucide-react'
+import { LogOut, LogIn, Store, Shield, Home as HomeIcon, Menu, X, ShoppingCart } from 'lucide-react'
 import DeliveryDashboard from "./pages/DeliveryDashboard";
 import Home from './pages/Home.jsx'
 import Login from './pages/Login.jsx'
@@ -84,7 +84,6 @@ function App() {
     <BrowserRouter>
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden" dir="rtl">
         
-        {/* Animated Background Blobs */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-40 -left-40 w-96 h-96 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
           <div className="absolute -top-40 -right-40 w-96 h-96 bg-pink-600 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
@@ -92,7 +91,6 @@ function App() {
           <div className="absolute bottom-20 right-20 w-96 h-96 bg-indigo-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
         </div>
 
-        {/* Grid Pattern Overlay */}
         <div className="fixed inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PHBhdGggZD0iTTM2IDM0djItSDI0di0yaDEyek0zNiAyNHYySDI0di0yaDEyek0zNiAxNHYySDI0di0yaDEyeiIvPjwvZz48L2c+PC9zdmc+')] opacity-40 pointer-events-none"></div>
 
         <div className="relative min-h-screen">
@@ -107,7 +105,6 @@ function App() {
 
           <main className="relative">
             <Routes>
-              
               <Route path="/" element={<Home />} />
               <Route path="/login" element={!session ? <Login /> : <Navigate to="/" replace />} />
               <Route path="/shop/:id" element={<ShopPage />} />
@@ -129,18 +126,11 @@ function App() {
               />
               <Route path="/Cart" element={<Cart />} />
               <Route path="/Checkout" element={<Checkout />} />
-<Route
-  path="/delivery"
-  element={<DeliveryDashboard />}
-/>          </Routes>
+              <Route path="/delivery" element={<DeliveryDashboard />} />
+              <Route path="*" element={<div className="p-8 text-center text-2xl text-white">404 - الصفحة غير موجودة</div>} />
+            </Routes>
           </main>
-<main className="relative">
-  <Routes>
-    ...
-  </Routes>
-</main>
 
-<footer className="relative mt-20 border-t border-white/10 bg-black/20 backdrop-blur-xl"></footer>
           <footer className="relative mt-20 border-t border-white/10 bg-black/20 backdrop-blur-xl">
             <div className="max-w-7xl mx-auto px-4 py-8">
               <div className="text-center">
@@ -156,27 +146,6 @@ function App() {
 
         </div>
       </div>
-
-      <style jsx global>{`
-        @keyframes blob {
-          0% { transform: translate(0px, 0px) scale(1); }
-          33% { transform: translate(30px, -50px) scale(1.1); }
-          66% { transform: translate(-20px, 20px) scale(0.9); }
-          100% { transform: translate(0px, 0px) scale(1); }
-        }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-        .animation-delay-150 {
-          animation-delay: 150ms;
-        }
-      `}</style>
     </BrowserRouter>
   )
 }
@@ -281,8 +250,8 @@ function Navbar({ session, profile, handleLogout, mobileMenuOpen, setMobileMenuO
           <div className="md:hidden py-4 space-y-2 border-t border-white/10 animate-in slide-in-from-top duration-300">
             <NavLink to="/" icon={HomeIcon}>الرئيسية</NavLink>
             <NavLink to="/Cart" icon={ShoppingCart}>
-  السلة
-</NavLink>
+              السلة
+            </NavLink>
             {profile?.role === 'admin' && (
               <NavLink to="/admin" icon={Shield}>لوحة الأدمن</NavLink>
             )}
@@ -319,18 +288,6 @@ function Navbar({ session, profile, handleLogout, mobileMenuOpen, setMobileMenuO
           </div>
         )}
       </div>
-
-      <style jsx>{`
-        @keyframes gradient {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-        .animate-gradient {
-          animation: gradient 3s ease infinite;
-          background-size: 200% 200%;
-        }
-      `}</style>
     </nav>
   )
 }

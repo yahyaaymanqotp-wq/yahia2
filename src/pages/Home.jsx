@@ -112,7 +112,7 @@ export default function Home() {
                   {/* Image */}
                   <div className="relative h-48 overflow-hidden">
                     <img
-                      src={shop.image_url || 'https://via.placeholder.com/400x200'}
+                     src={shop.logo_url || shop.image_url || 'https://via.placeholder.com/400x200'}
                       alt={shop.name}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                     />

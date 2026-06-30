@@ -3,43 +3,7 @@ import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 export default function ShopPage() {
-  function addToCart(product) {
-
-  let cart =
-    JSON.parse(localStorage.getItem("cart") || "[]");
-
-  const index = cart.findIndex(
-    (p) => p.id === product.id
-  );
-
-  if (index > -1) {
-
-    cart[index].quantity += 1;
-
-  } else {
-
-    cart.push({
-
-      ...product,
-
-      quantity: 1,
-
-      shop_id: shop.id,
-      shop_name: shop.name,
-      shop_phone: shop.phone,
-      shop_address: shop.address
-
-    });
-
-  }
-
-  localStorage.setItem(
-    "cart",
-    JSON.stringify(cart)
-  );
-
-  alert("تمت إضافة المنتج إلى السلة");
-}
+  
   const { id } = useParams()
 
   const [shop, setShop] = useState(null)
@@ -70,25 +34,28 @@ const [cart, setCart] = useState([]);
     setProducts(data || [])
   }
 function addToCart(product) {
-  const oldCart = JSON.parse(localStorage.getItem("cart") || "[]");
+  const cart = JSON.parse(localStorage.getItem("cart") || "[]");
 
-  const found = oldCart.find((p) => p.id === product.id);
+  const index = cart.findIndex((item) => item.id === product.id);
 
-  if (found) {
-    found.quantity += 1;
+  if (index !== -1) {
+    cart[index].quantity += 1;
   } else {
-    oldCart.push({
+    cart.push({
       ...product,
       quantity: 1,
-      shop_id: id,
+
+      shop_id: shop.id,
+      shop_name: shop.name,
+      shop_phone: shop.phone || "",
+      shop_address: shop.address || "",
     });
   }
 
-  localStorage.setItem("cart", JSON.stringify(oldCart));
+  localStorage.setItem("cart", JSON.stringify(cart));
+  setCart(cart);
 
-  setCart(oldCart);
-
-  alert("✅ تم إضافة المنتج إلى السلة");
+  alert("✅ تمت إضافة المنتج إلى السلة");
 }
   if (!shop) {
     return (
