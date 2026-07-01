@@ -38,7 +38,6 @@ export default function Login() {
           </button>
         </form>
         <p className="text-center mt-6 text-gray-600">
-          معندكش حساب؟ <Link to="/signup" className="text-emerald-600 font-semibold">سجل دلوقتي</Link>
         </p>
       </div>
     </div>
