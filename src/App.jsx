@@ -1,71 +1,102 @@
 import Cart from './pages/Cart.jsx'
 import Checkout from './pages/Checkout.jsx'
-import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { BrowserRouter, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from './lib/supabase'
-import { LogOut, LogIn, Store, Shield, Home as HomeIcon, Menu, X, ShoppingCart, Search, Bell, Heart, User, Tag, LayoutGrid, MapPin } from 'lucide-react'
-import DeliveryDashboard from "./pages/DeliveryDashboard";
+import { LogOut, LogIn, Store, Shield, Home as HomeIcon, Menu, X, ShoppingCart, Search, Bell, Heart, User, Tag, LayoutGrid, MapPin, Settings, Crown, Info, MessageCircle, Package, Phone } from 'lucide-react'
+import DeliveryDashboard from "./pages/DeliveryDashboard"
 import Home from './pages/Home.jsx'
 import Login from './pages/Login.jsx'
 import AdminDashboard from './pages/AdminDashboard.jsx'
 import ShopDashboard from './pages/ShopDashboard.jsx'
 import ShopPage from './pages/ShopPage.jsx'
+import Complaints from './pages/Complaints.jsx'
+import About from './pages/About.jsx'
+import TrackOrder from './pages/TrackOrder.jsx'
 
-function App() {
+function AppContent() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const mountedRef = useRef(true)
 
   useEffect(() => {
-    getCurrentSession()
+    mountedRef.current = true
 
-    const {
-      data: { subscription }
-    } = supabase.auth.onAuthStateChange(
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mountedRef.current) return
+      setSession(session)
+      if (session?.user) {
+        getProfile(session.user.id)
+      } else {
+        setLoading(false)
+      }
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
+        if (!mountedRef.current) return
         setSession(session)
         if (session?.user) {
           await getProfile(session.user.id)
         } else {
           setProfile(null)
+          setLoading(false)
         }
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      mountedRef.current = false
+      subscription.unsubscribe()
+    }
   }, [])
 
-  async function getCurrentSession() {
-    const {
-      data: { session }
-    } = await supabase.auth.getSession()
+  // التوجيه التلقائي حسب الرول
+  useEffect(() => {
+    if (loading ||!profile) return
 
-    setSession(session)
-    if (session?.user) {
-      await getProfile(session.user.id)
+    const currentPath = location.pathname
+    console.log('Current profile:', profile)
+
+    if (profile.role === 'admin' && (currentPath === '/' || currentPath === '/login')) {
+      navigate('/admin', { replace: true })
+      return
     }
-    setLoading(false)
-  }
+
+    if (profile.role === 'shop_owner' && profile.shop_id && (currentPath === '/' || currentPath === '/login')) {
+      navigate('/shop-dashboard', { replace: true })
+      return
+    }
+  }, [profile, loading, location.pathname, navigate])
 
   async function getProfile(userId) {
     const { data, error } = await supabase
-     .from('profiles')
-     .select('*')
-     .eq('id', userId)
-     .single()
+.from('profiles')
+.select('*, shops(id, name)')
+.eq('id', userId)
+.single()
 
     if (error) {
-      console.log(error)
+      console.log('Profile error:', error)
+      setLoading(false)
       return
     }
-    setProfile(data)
+    console.log('Profile loaded:', data)
+    if (mountedRef.current) {
+      setProfile(data)
+      setLoading(false)
+    }
   }
 
   async function handleLogout() {
     await supabase.auth.signOut()
     setProfile(null)
     setMobileMenuOpen(false)
+    navigate('/')
   }
 
   if (loading) {
@@ -80,50 +111,59 @@ function App() {
   }
 
   return (
-    <BrowserRouter>
-      <div className="min-h-screen bg-[#121212] text-white relative overflow-hidden" dir="rtl">
-        <div className="relative min-h-screen pb-20">
-          
-          <Navbar 
-            session={session} 
-            profile={profile} 
-            handleLogout={handleLogout}
-            mobileMenuOpen={mobileMenuOpen}
-            setMobileMenuOpen={setMobileMenuOpen}
-          />
+    <div className="min-h-screen bg-[#121212] text-white relative overflow-hidden" dir="rtl">
+      <div className="relative min-h-screen pb-20">
 
-          <main className="relative">
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/login" element={!session? <Login /> : <Navigate to="/" replace />} />
-              <Route path="/shop/:id" element={<ShopPage />} />
-              <Route
-                path="/admin"
-                element={
-                  profile?.role === 'admin'
-                   ? <AdminDashboard profile={profile} />
-                    : <Navigate to="/" replace />
-                }
-              />
-              <Route
-                path="/shop-dashboard"
-                element={
-                  profile?.role === 'shop_owner'
-                   ? <ShopDashboard profile={profile} />
-                    : <Navigate to="/" replace />
-                }
-              />
-              <Route path="/Cart" element={<Cart />} />
-              <Route path="/Checkout" element={<Checkout />} />
-              <Route path="/delivery" element={<DeliveryDashboard />} />
-              <Route path="*" element={<div className="p-8 text-center text-2xl text-white">404 - الصفحة غير موجودة</div>} />
-            </Routes>
-          </main>
+        <Navbar
+          session={session}
+          profile={profile}
+          handleLogout={handleLogout}
+          mobileMenuOpen={mobileMenuOpen}
+          setMobileMenuOpen={setMobileMenuOpen}
+        />
 
-          <BottomNav />
+        <main className="relative">
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={!session? <Login /> : <Navigate to="/" replace />} />
+            <Route path="/shop/:id" element={<ShopPage />} />
+            <Route path="/complaints" element={<Complaints />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/track-order" element={<TrackOrder />} />
+            <Route
+              path="/admin"
+              element={
+                profile?.role === 'admin'
+         ? <AdminDashboard profile={profile} />
+                  : <Navigate to="/" replace />
+              }
+            />
+            <Route
+              path="/shop-dashboard"
+              element={
+                profile?.role === 'shop_owner' && profile?.shop_id
+         ? <ShopDashboard profile={profile} />
+                  : <Navigate to="/" replace />
+              }
+            />
+            <Route path="/Cart" element={<Cart />} />
+            <Route path="/Checkout" element={<Checkout />} />
+            <Route path="/delivery" element={<DeliveryDashboard />} />
+            <Route path="*" element={<div className="p-8 text-center text-2xl text-white">404 - الصفحة غير موجودة</div>} />
+          </Routes>
+        </main>
 
-        </div>
+        <BottomNav profile={profile} />
+
       </div>
+    </div>
+  )
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
     </BrowserRouter>
   )
 }
@@ -133,7 +173,7 @@ function Navbar({ session, profile, handleLogout, mobileMenuOpen, setMobileMenuO
     <nav className="sticky top-0 z-50 bg-[#121212] border-b border-[#333]">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          
+
           <button className="text-[#D4AF37]">
             <Bell size={24} />
           </button>
@@ -143,24 +183,45 @@ function Navbar({ session, profile, handleLogout, mobileMenuOpen, setMobileMenuO
               <div className="text-[#D4AF37] text-2xl font-bold">▼</div>
               <div>
                 <h1 className="text-xl font-bold text-[#D4AF37]">مول فاقوس</h1>
-                <p className="text-[10px] text-gray-400">تجربة تسوق متكاملة</p>
+                <p className="text-xs text-gray-400">تجربة تسوق متكاملة</p>
               </div>
             </div>
           </Link>
 
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="text-[#D4AF37]"
-          >
-            {mobileMenuOpen? <X size={24} /> : <Menu size={24} />}
-          </button>
+          <div className="flex items-center gap-2">
+            {profile?.role === 'admin' && (
+              <Link
+                to="/admin"
+                className="hidden md:flex items-center gap-1 px-3 py-2 rounded-lg bg-red-500/20 text-red-400 text-sm font-bold hover:bg-red-500/30 transition"
+              >
+                <Shield size={16} />
+                <span>الأدمن</span>
+              </Link>
+            )}
+
+            {profile?.role === 'shop_owner' && profile?.shop_id && (
+              <Link
+                to="/shop-dashboard"
+                className="hidden md:flex items-center gap-1 px-3 py-2 rounded-lg bg-[#D4AF37]/20 text-[#D4AF37] text-sm font-bold hover:bg-[#D4AF37]/30 transition"
+              >
+                <Settings size={16} />
+                <span>لوحة المحل</span>
+              </Link>
+            )}
+
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="text-[#D4AF37]"
+            >
+              {mobileMenuOpen? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
         </div>
 
-        {/* Search Bar */}
         <div className="pb-4">
           <div className="relative">
-            <input 
-              type="text" 
+            <input
+              type="text"
               placeholder="ابحث عن منتجات، محلات أو عروض..."
               className="w-full bg-[#1E1E1E] border border-[#333] rounded-xl py-3 px-4 pr-12 text-sm focus:outline-none focus:border-[#D4AF37] placeholder:text-gray-500"
             />
@@ -170,14 +231,51 @@ function Navbar({ session, profile, handleLogout, mobileMenuOpen, setMobileMenuO
 
         {mobileMenuOpen && (
           <div className="py-4 space-y-2 border-t border-[#333] animate-in slide-in-from-top duration-300">
-            <MobileMenuLink to="/" setMobileMenuOpen={setMobileMenuOpen}>الرئيسية</MobileMenuLink>
-            <MobileMenuLink to="/Cart" setMobileMenuOpen={setMobileMenuOpen}>السلة</MobileMenuLink>
+            {session && (
+              <div className="px-4 py-3 bg-[#1E1E1E] rounded-xl mb-2">
+                <p className="text-[#D4AF37] text-sm font-bold flex items-center gap-2">
+                  <User size={16} />
+                  {profile?.username || profile?.full_name || 'مستخدم'}
+                </p>
+                {profile?.role === 'shop_owner' && profile?.shops && (
+                  <p className="text-white/60 text-xs mt-1 flex items-center gap-1">
+                    <Store size={12} />
+                    {profile.shops.name}
+                  </p>
+                )}
+                {profile?.role === 'admin' && (
+                  <p className="text-red-400 text-xs mt-1 flex items-center gap-1">
+                    <Crown size={12} />
+                    أدمن النظام
+                  </p>
+                )}
+              </div>
+            )}
+
+            <MobileMenuLink to="/" setMobileMenuOpen={setMobileMenuOpen}>
+              <HomeIcon size={18} />
+              <span>الرئيسية</span>
+            </MobileMenuLink>
+
+            <MobileMenuLink to="/Cart" setMobileMenuOpen={setMobileMenuOpen}>
+              <ShoppingCart size={18} />
+              <span>السلة</span>
+            </MobileMenuLink>
+
             {profile?.role === 'admin' && (
-              <MobileMenuLink to="/admin" setMobileMenuOpen={setMobileMenuOpen}>لوحة الأدمن</MobileMenuLink>
+              <MobileMenuLink to="/admin" setMobileMenuOpen={setMobileMenuOpen}>
+                <Shield size={18} />
+                <span>لوحة الأدمن</span>
+              </MobileMenuLink>
             )}
-            {profile?.role === 'shop_owner' && (
-              <MobileMenuLink to="/shop-dashboard" setMobileMenuOpen={setMobileMenuOpen}>لوحة المحل</MobileMenuLink>
+
+            {profile?.role === 'shop_owner' && profile?.shop_id && (
+              <MobileMenuLink to="/shop-dashboard" setMobileMenuOpen={setMobileMenuOpen}>
+                <Settings size={18} />
+                <span>لوحة المحل</span>
+              </MobileMenuLink>
             )}
+
             {session? (
               <button
                 onClick={handleLogout}
@@ -190,7 +288,7 @@ function Navbar({ session, profile, handleLogout, mobileMenuOpen, setMobileMenuO
               <Link
                 to="/login"
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-2 w-full px-4 py-3 rounded-xl bg-green-600 text-white font-bold"
+                className="flex items-center gap-2 w-full px-4 py-3 rounded-xl bg-[#D4AF37] text-black font-bold"
               >
                 <LogIn size={18} />
                 <span>تسجيل الدخول</span>
@@ -208,20 +306,21 @@ function MobileMenuLink({ to, children, setMobileMenuOpen }) {
     <Link
       to={to}
       onClick={() => setMobileMenuOpen(false)}
-      className="block px-4 py-3 rounded-xl bg-[#1E1E1E] text-white hover:bg-[#2a2a2a] transition"
+      className="flex items-center gap-2 px-4 py-3 rounded-xl bg-[#1E1E1E] text-white hover:bg-[#2a2a2a] transition"
     >
       {children}
     </Link>
   )
 }
 
-function BottomNav() {
+function BottomNav({ profile }) {
   const location = useLocation()
+  const navigate = useNavigate()
   const isActive = (path) => location.pathname === path
 
   const NavItem = ({ to, icon: Icon, label }) => (
-    <Link
-      to={to}
+    <button
+      onClick={() => navigate(to)}
       className={`flex flex-col items-center gap-1 ${
         isActive(to)? 'text-[#D4AF37]' : 'text-gray-500'
       }`}
@@ -233,17 +332,17 @@ function BottomNav() {
       ) : (
         <Icon size={22} />
       )}
-      <span className="text-[10px]">{label}</span>
-    </Link>
+      <span className="text-xs">{label}</span>
+    </button>
   )
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-[#1E1E1E] border-t border-[#333] flex justify-around items-center py-2 z-50">
-      <NavItem to="/profile" icon={User} label="حسابي" />
-      <NavItem to="/Cart" icon={Heart} label="المفضلة" />
+      <NavItem to="/about" icon={Info} label="نبذة عنا" />
+      <NavItem to="/Cart" icon={ShoppingCart} label="سلة التسوق" />
       <NavItem to="/" icon={HomeIcon} label="الرئيسية" />
-      <NavItem to="/offers" icon={Tag} label="العروض" />
-      <NavItem to="/categories" icon={LayoutGrid} label="الأقسام" />
+      <NavItem to="/complaints" icon={MessageCircle} label="الشكاوى" />
+      <NavItem to="/track-order" icon={Package} label="تتبع الطلب" />
     </div>
   )
 }

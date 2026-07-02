@@ -1,10 +1,11 @@
 import { useEffect, useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { Store, MapPin, Star, TrendingUp, Sparkles, ShoppingCart, Shirt, Utensils, Smartphone, Gem, Sofa, Dumbbell, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Store, MapPin, Star, TrendingUp, Sparkles, ShoppingCart, Shirt, Utensils, Smartphone, Gem, Sofa, Dumbbell, ChevronLeft, ChevronRight, Package } from 'lucide-react'
 
 export default function Home() {
   const [shops, setShops] = useState([])
+  const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [activeCategory, setActiveCategory] = useState('الكل')
@@ -13,47 +14,97 @@ export default function Home() {
   const categoriesScrollRef = useRef(null)
 
   useEffect(() => {
+    fetchCategories()
     fetchShops()
+
+    const catsSubscription = supabase
+  .channel('categories_changes')
+  .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'categories' },
+        () => fetchCategories()
+      )
+  .subscribe()
+
+    const shopsSubscription = supabase
+  .channel('shops_changes')
+  .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'shops' },
+        () => fetchShops()
+      )
+  .subscribe()
+
+    return () => {
+      catsSubscription.unsubscribe()
+      shopsSubscription.unsubscribe()
+    }
   }, [])
+
+  async function fetchCategories() {
+    const { data, error } = await supabase
+  .from('categories')
+  .select('*')
+  .order('display_order', { ascending: true })
+
+    if (!error) setCategories(data || [])
+  }
 
   async function fetchShops() {
     const { data, error } = await supabase
-     .from('shops')
-     .select('*')
-     .eq('is_active', true)
-     .order('created_at', { ascending: false })
+  .from('shops')
+  .select(`
+        *,
+        category:categories(id, name, icon, slug)
+      `)
+  .eq('is_active', true)
+  .eq('is_verified', true)
+  .order('rating', { ascending: false })
 
     if (!error) {
-      console.log('Shops loaded:', data) // عشان تشوف الداتا في الكونسول
+      console.log('Shops loaded:', data)
       setShops(data || [])
     } else {
-      console.log('Error:', error)
+      console.error('Error loading shops:', error)
     }
     setLoading(false)
   }
 
   const filteredShops = shops.filter(shop =>
     shop.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    shop.category?.toLowerCase().includes(searchTerm.toLowerCase())
+    shop.category?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    shop.description?.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  // الأقسام - ضيف اللي انت عاوزه هنا
-  const categories = [
-    { name: 'الكل', icon: Store },
-    { name: 'ملابس', icon: Shirt },
-    { name: 'مطاعم', icon: Utensils },
-    { name: 'إلكترونيات', icon: Smartphone },
-    { name: 'إكسسوارات', icon: Gem },
-    { name: 'أثاث', icon: Sofa },
-    { name: 'رياضة', icon: Dumbbell }
+  function getCategoryIcon(iconStr) {
+    const iconMap = {
+      '🍔': Utensils,
+      '👕': Shirt,
+      '📱': Smartphone,
+      '💍': Gem,
+      '🛋️': Sofa,
+      '⚽': Dumbbell,
+      '🏪': Store,
+      'Utensils': Utensils,
+      'Shirt': Shirt,
+      'Smartphone': Smartphone,
+      'Gem': Gem,
+      'Home': Sofa,
+      'Package': Package,
+      'Store': Store
+    }
+    return iconMap[iconStr] || Store
+  }
+
+  const allCategories = [
+    { id: 'all', name: 'الكل', icon: Store, slug: 'all' },
+ ...categories.map(cat => ({
+   ...cat,
+      icon: getCategoryIcon(cat.icon)
+    }))
   ]
 
-  // نفلتر المحلات - بس المهم: trim + lowercase عشان يطابق
   const getShopsByCategory = (cat) => {
-    if (cat === 'الكل') return filteredShops
-    return filteredShops.filter(shop =>
-      shop.category?.trim().toLowerCase() === cat.toLowerCase()
-    )
+    if (cat.name === 'الكل' || cat.id === 'all') return filteredShops
+    return filteredShops.filter(shop => shop.category?.id === cat.id)
   }
 
   const scrollToCategory = (catName) => {
@@ -123,7 +174,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Categories Row - شريط سحب أفقي */}
+          {/* Categories Row */}
           <div className="max-w-4xl mx-auto relative">
             <button
               onClick={() => scrollCategories('right')}
@@ -136,16 +187,16 @@ export default function Home() {
               ref={categoriesScrollRef}
               className="flex items-center gap-3 overflow-x-auto pb-2 px-10 md:px-2 scrollbar-hide scroll-smooth"
             >
-              {categories.map((cat) => {
+              {allCategories.map((cat) => {
                 const Icon = cat.icon
                 const isActive = activeCategory === cat.name
                 return (
                   <button
-                    key={cat.name}
+                    key={cat.id}
                     onClick={() => scrollToCategory(cat.name)}
                     className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all duration-300 flex-shrink-0 ${
                       isActive
-                       ? 'bg-[#C9A961] text-black shadow-lg shadow-[#C9A961]/30'
+                 ? 'bg-[#C9A961] text-black shadow-lg shadow-[#C9A961]/30'
                         : 'bg-[#1A1A1D] border border-[#C9A961]/20 text-white/70 hover:text-[#C9A961] hover:border-[#C9A961]/40'
                     }`}
                   >
@@ -166,22 +217,22 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Shops Grid - متقسم حسب الكاتيجوري */}
+      {/* Shops Grid */}
       <div className="max-w-7xl mx-auto px-4">
         {activeCategory === 'الكل'? (
-          // عرض كل الأقسام
-          categories.slice(1).map((cat) => {
-            const catShops = getShopsByCategory(cat.name)
+          categories.filter(c => c.slug!== 'all').map((cat) => {
+            const catShops = getShopsByCategory(cat)
+            const Icon = getCategoryIcon(cat.icon)
 
             return (
               <div
-                key={cat.name}
+                key={cat.id}
                 ref={el => categoryRefs.current[cat.name] = el}
                 className="mb-16 scroll-mt-24"
               >
                 <div className="flex items-center justify-between mb-8">
                   <h2 className="text-3xl font-bold text-white flex items-center gap-3">
-                    <cat.icon className="text-[#C9A961]" />
+                    <Icon className="text-[#C9A961]" />
                     <span>{cat.name}</span>
                     <span className="text-sm px-3 py-1 rounded-full bg-[#C9A961]/10 text-[#C9A961]">
                       {catShops.length}
@@ -192,7 +243,7 @@ export default function Home() {
                 {catShops.length === 0? (
                   <div className="text-center py-16 bg-[#1A1A1D] rounded-2xl border border-[#C9A961]/10">
                     <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-[#C9A961]/10 flex items-center justify-center">
-                      <cat.icon className="text-[#C9A961]/40" size={32} />
+                      <Icon className="text-[#C9A961]/40" size={32} />
                     </div>
                     <p className="text-white/50 text-lg">لا يوجد محلات في قسم {cat.name} حالياً</p>
                   </div>
@@ -207,36 +258,45 @@ export default function Home() {
             )
           })
         ) : (
-          // عرض كاتيجوري واحد بس
           <div
             ref={el => categoryRefs.current[activeCategory] = el}
             className="scroll-mt-24"
           >
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="text-3xl font-bold text-white flex items-center gap-3">
-                <Store className="text-[#C9A961]" />
-                <span>{activeCategory}</span>
-                <span className="text-sm px-3 py-1 rounded-full bg-[#C9A961]/10 text-[#C9A961]">
-                  {getShopsByCategory(activeCategory).length}
-                </span>
-              </h2>
-            </div>
+            {(() => {
+              const selectedCat = categories.find(c => c.name === activeCategory)
+              const Icon = selectedCat? getCategoryIcon(selectedCat.icon) : Store
+              const catShops = selectedCat? getShopsByCategory(selectedCat) : []
 
-            {getShopsByCategory(activeCategory).length === 0? (
-              <div className="text-center py-20 bg-[#1A1A1D] rounded-2xl border border-[#C9A961]/10">
-                <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-[#C9A961]/10 flex items-center justify-center">
-                  <Store className="text-[#C9A961]/40" size={40} />
-                </div>
-                <p className="text-white/60 text-xl mb-2">لا يوجد محلات في قسم {activeCategory}</p>
-                <p className="text-white/40 text-sm">جرب تبحث في قسم تاني</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {getShopsByCategory(activeCategory).map((shop, index) => (
-                  <ShopCard key={shop.id} shop={shop} index={index} />
-                ))}
-              </div>
-            )}
+              return (
+                <>
+                  <div className="flex items-center justify-between mb-8">
+                    <h2 className="text-3xl font-bold text-white flex items-center gap-3">
+                      <Icon className="text-[#C9A961]" />
+                      <span>{activeCategory}</span>
+                      <span className="text-sm px-3 py-1 rounded-full bg-[#C9A961]/10 text-[#C9A961]">
+                        {catShops.length}
+                      </span>
+                    </h2>
+                  </div>
+
+                  {catShops.length === 0? (
+                    <div className="text-center py-20 bg-[#1A1A1D] rounded-2xl border border-[#C9A961]/10">
+                      <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-[#C9A961]/10 flex items-center justify-center">
+                        <Store className="text-[#C9A961]/40" size={40} />
+                      </div>
+                      <p className="text-white/60 text-xl mb-2">لا يوجد محلات في قسم {activeCategory}</p>
+                      <p className="text-white/40 text-sm">جرب تبحث في قسم تاني</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {catShops.map((shop, index) => (
+                        <ShopCard key={shop.id} shop={shop} index={index} />
+                      ))}
+                    </div>
+                  )}
+                </>
+              )
+            })()}
           </div>
         )}
       </div>
@@ -249,11 +309,12 @@ export default function Home() {
         <ShoppingCart size={28} />
       </Link>
 
-      <style jsx>{`
-       .scrollbar-hide::-webkit-scrollbar {
+      {/* CSS عادي بدل styled-jsx */}
+      <style>{`
+ .scrollbar-hide::-webkit-scrollbar {
           display: none;
         }
-       .scrollbar-hide {
+ .scrollbar-hide {
           -ms-overflow-style: none;
           scrollbar-width: none;
         }
@@ -275,15 +336,15 @@ function ShopCard({ shop, index }) {
       <div className="relative bg-[#1A1A1D] border border-[#C9A961]/10 rounded-3xl overflow-hidden hover:border-[#C9A961]/30 transition-all duration-500 hover:scale-[1.02] hover:-translate-y-1">
         <div className="relative h-48 overflow-hidden">
           <img
-            src={shop.logo_url || shop.image_url || 'https://via.placeholder.com/400x200'}
+            src={shop.image_url || 'https://placehold.co/400x200/1A1A1D/C9A961?text=محل'}
             alt={shop.name}
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0B] via-[#0A0A0B]/40 to-transparent"></div>
 
           {shop.category && (
-            <div className="absolute top-4 right-4 px-3 py-1 rounded-full bg-[#C9A961] text-black text-xs font-bold">
-              {shop.category}
+            <div className="absolute top-4 right-4 px-3 py-1 rounded-full bg-[#C9A961] text-black text-xs font-bold flex items-center gap-1">
+              <span>{shop.category.name}</span>
             </div>
           )}
         </div>
@@ -304,7 +365,7 @@ function ShopCard({ shop, index }) {
             </div>
             <div className="flex items-center gap-1">
               <Star size={16} className="text-[#C9A961] fill-[#C9A961]" />
-              <span className="text-white/60">4.5</span>
+              <span className="text-white/60">{shop.rating || 5}</span>
             </div>
           </div>
 
