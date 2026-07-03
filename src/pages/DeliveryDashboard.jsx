@@ -1,25 +1,30 @@
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "../lib/supabase";
+import { Truck, Phone, EyeOff, LogOut, TrendingUp, CheckCircle, Clock, Package } from "lucide-react";
 
 const ORDER_FLOW = [
-  { status: "جديد", icon: "🆕", color: "bg-gray-500", label: "طلب جديد" },
-  { status: "تم استلام الطلب", icon: "📦", color: "bg-yellow-500", label: "استلام الطلب" },
-  { status: "جاري الشحن", icon: "🚚", color: "bg-blue-600", label: "جاري الشحن" },
-  { status: "تم الشحن", icon: "📬", color: "bg-purple-600", label: "تم الشحن" },
-  { status: "تم التسليم", icon: "✅", color: "bg-green-600", label: "تم التسليم" },
+  { status: "pending", icon: "🆕", color: "bg-gray-500", label: "طلب جديد" },
+  { status: "accepted", icon: "📦", color: "bg-yellow-500", label: "تم الاستلام" },
+  { status: "preparing", icon: "⏳", color: "bg-orange-500", label: "جاري التجهيز" },
+  { status: "shipping", icon: "🚚", color: "bg-blue-600", label: "جاري الشحن" },
+  { status: "delivered", icon: "✅", color: "bg-green-600", label: "تم التسليم" },
 ];
 
-const FINAL_STATUS = "تم الشحن";
+const FINAL_STATUS = "delivered";
 
 export default function DeliveryDashboard() {
   const [orders, setOrders] = useState([]);
-  const [shopsMap, setShopsMap] = useState({}); // نخزن أسماء المحلات بالـ ID
+  const [shopsMap, setShopsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [toast, setToast] = useState(null);
   const [showPhone, setShowPhone] = useState({});
   const [activeTab, setActiveTab] = useState("all");
+  const [deliveryFee, setDeliveryFee] = useState({});
+
+  const deliveryCompanyId = parseInt(localStorage.getItem('delivery_company_id'));
+  const companyName = localStorage.getItem('delivery_company_name');
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -33,23 +38,24 @@ export default function DeliveryDashboard() {
     return str.slice(0, 3) + "****" + str.slice(-4);
   };
 
-  // دالة ذكية تجيب اسم المحل من أي مكان
   const getShopName = (order) => {
-    // 1. من الجدول مباشرة
-    if (order.shop_name) return order.shop_name;
-
-    // 2. من أول منتج في الـ items
-    const itemShopId = order.items?.[0]?.shop_id;
-    if (itemShopId && shopsMap[itemShopId]) {
-      return shopsMap[itemShopId];
-    }
-
-    // 3. من shop_id الرئيسي
-    if (order.shop_id && shopsMap[order.shop_id]) {
-      return shopsMap[order.shop_id];
-    }
-
+    if (order.shops?.name) return order.shops.name;
+    if (order.shop_id && shopsMap[order.shop_id]) return shopsMap[order.shop_id];
     return "غير محدد";
+  };
+
+  const getOrderItemsTotal = (order) => {
+    if (order.subtotal) return parseFloat(order.subtotal);
+    if (!order.order_items?.length) return 0;
+    return order.order_items.reduce((sum, item) => {
+      return sum + ((parseFloat(item.price) || 0) * (parseFloat(item.quantity) || 1));
+    }, 0);
+  };
+
+  const getOrderTotal = (order) => {
+    const itemsTotal = getOrderItemsTotal(order);
+    const delivery = parseFloat(order.delivery_fee) || 0;
+    return itemsTotal + delivery;
   };
 
   const getStatusConfig = (status) => {
@@ -68,30 +74,26 @@ export default function DeliveryDashboard() {
   };
 
   useEffect(() => {
-    loadShops(); // نجيب أسماء المحلات الأول
+    loadShops();
     loadOrders();
     const channel = supabase
-  .channel("orders-changes")
-  .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => loadOrders())
-  .subscribe();
+   .channel("delivery_orders")
+   .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, loadOrders)
+   .subscribe();
     return () => supabase.removeChannel(channel);
   }, []);
 
-  // نجيب كل المحلات ونخزنهم في Map
   async function loadShops() {
     try {
       const { data, error } = await supabase
-    .from("shops") // غيّر الاسم لو جدول المحلات اسمه مختلف
-    .select("id, name, shop_name, store_name");
+     .from("shops")
+     .select("id, name");
 
-      if (error) {
-        console.warn("مفيش جدول shops أو فيه خطأ:", error);
-        return;
-      }
+      if (error) return;
 
       const map = {};
       data?.forEach(shop => {
-        map[shop.id] = shop.name || shop.shop_name || shop.store_name;
+        map[shop.id] = shop.name;
       });
       setShopsMap(map);
     } catch (error) {
@@ -102,9 +104,13 @@ export default function DeliveryDashboard() {
   async function loadOrders() {
     try {
       const { data, error } = await supabase
-    .from("orders")
-    .select("*")
-    .order("created_at", { ascending: false });
+     .from("orders")
+     .select(`
+          *,
+          shops(name, address, phone),
+          order_items(*, products(name, image_url))
+        `)
+     .order("created_at", { ascending: false });
 
       if (error) throw error;
       setOrders(data || []);
@@ -116,27 +122,38 @@ export default function DeliveryDashboard() {
     }
   }
 
-  async function moveToNextStatus(orderId, currentStatus) {
+  async function moveToNextStatus(orderId, currentStatus, order) {
     const next = getNextStatus(currentStatus);
     if (!next) return;
 
+    if (next.status === 'accepted' &&!order.delivery_fee) {
+      const fee = deliveryFee[orderId];
+      if (!fee || parseFloat(fee) <= 0) {
+        showToast("أدخل سعر التوصيل أولاً", "error");
+        return;
+      }
+    }
+
     setUpdatingId(orderId);
-    setOrders(prev => prev.map(order =>
-      order.id === orderId? {...order, status: next.status } : order
+    setOrders(prev => prev.map(o =>
+      o.id === orderId? {...o, delivery_status: next.status } : o
     ));
 
     try {
+      const updateData = {
+        delivery_status: next.status,
+        delivery_company_id: deliveryCompanyId,
+        updated_at: new Date().toISOString()
+      };
+
+      if (next.status === 'accepted' && deliveryFee[orderId]) {
+        updateData.delivery_fee = parseFloat(deliveryFee[orderId]);
+      }
+
       const { error } = await supabase
-    .from("orders")
-    .update({
-          status: next.status,
-          status_updated_at: new Date().toISOString(),
-          // لو الحالة "تم الشحن" نحط التاريخ
-         ...(next.status === "تم الشحن" && { shipped_at: new Date().toISOString() }),
-          // لو الحالة "تم التسليم" نحط التاريخ
-         ...(next.status === "تم التسليم" && { delivered_at: new Date().toISOString() })
-        })
-    .eq("id", orderId);
+     .from("orders")
+     .update(updateData)
+     .eq("id", orderId);
 
       if (error) throw error;
       showToast(`✅ ${next.label}`, "success");
@@ -151,11 +168,11 @@ export default function DeliveryDashboard() {
 
   const stats = useMemo(() => {
     const total = orders.length;
-    const active = orders.filter(o => o.status!== FINAL_STATUS && o.status!== "تم التسليم").length;
-    const completed = orders.filter(o => o.status === FINAL_STATUS || o.status === "تم التسليم").length;
+    const active = orders.filter(o => o.delivery_status!== FINAL_STATUS && o.delivery_status!== "cancelled").length;
+    const completed = orders.filter(o => o.delivery_status === FINAL_STATUS).length;
     const revenue = orders
-   .filter(o => o.status === FINAL_STATUS || o.status === "تم التسليم")
-   .reduce((sum, o) => sum + (parseFloat(o.total) || 0), 0);
+   .filter(o => o.delivery_status === FINAL_STATUS)
+   .reduce((sum, o) => sum + (parseFloat(o.delivery_fee) || 0), 0);
 
     return { total, active, completed, revenue };
   }, [orders]);
@@ -164,7 +181,7 @@ export default function DeliveryDashboard() {
     let filtered = orders.filter(order => {
       const q = searchQuery.toLowerCase();
       return (
-        order.order_number?.toString().includes(q) ||
+        order.id?.toString().includes(q) ||
         order.customer_name?.toLowerCase().includes(q) ||
         order.customer_phone?.includes(q) ||
         getShopName(order).toLowerCase().includes(q)
@@ -172,14 +189,14 @@ export default function DeliveryDashboard() {
     });
 
     if (activeTab === "active") {
-      filtered = filtered.filter(o => o.status!== FINAL_STATUS && o.status!== "تم التسليم");
+      filtered = filtered.filter(o => o.delivery_status!== FINAL_STATUS && o.delivery_status!== "cancelled");
     } else if (activeTab === "completed") {
-      filtered = filtered.filter(o => o.status === FINAL_STATUS || o.status === "تم التسليم");
+      filtered = filtered.filter(o => o.delivery_status === FINAL_STATUS);
     }
 
     return filtered.sort((a, b) => {
-      const aIsDone = a.status === FINAL_STATUS || a.status === "تم التسليم";
-      const bIsDone = b.status === FINAL_STATUS || b.status === "تم التسليم";
+      const aIsDone = a.delivery_status === FINAL_STATUS;
+      const bIsDone = b.delivery_status === FINAL_STATUS;
       if (aIsDone &&!bIsDone) return 1;
       if (!aIsDone && bIsDone) return -1;
       return new Date(b.created_at) - new Date(a.created_at);
@@ -208,10 +225,20 @@ export default function DeliveryDashboard() {
       )}
 
       <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-4xl md:text-5xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
-            لوحة شركة التوصيل
-          </h1>
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-4xl md:text-5xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
+              لوحة شركة التوصيل
+            </h1>
+            <p className="text-gray-400">مرحبا {companyName}</p>
+          </div>
+          <button
+            onClick={() => { localStorage.clear(); window.location.href = '/login' }}
+            className="bg-red-500/20 text-red-400 px-6 py-2 rounded-lg font-bold flex items-center gap-2"
+          >
+            <LogOut size={18} />
+            خروج
+          </button>
         </div>
 
         <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 mb-4 border border-white/20">
@@ -227,9 +254,8 @@ export default function DeliveryDashboard() {
           </div>
         </div>
 
-        {/* كروت الإحصائيات - رجعت */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-gradient-to-br from-purple-600 to-purple-800 rounded-2xl p-5 text-white shadow-xl transform hover:scale-105 transition-transform">
+          <div className="bg-gradient-to-br from-purple-600 to-purple-800 rounded-2xl p-5 text-white shadow-xl">
             <div className="flex items-center justify-between mb-2">
               <span className="text-3xl">📊</span>
               <span className="text-sm opacity-80">الإجمالي</span>
@@ -238,7 +264,7 @@ export default function DeliveryDashboard() {
             <p className="text-sm opacity-80 mt-1">طلب</p>
           </div>
 
-          <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl p-5 text-white shadow-xl transform hover:scale-105 transition-transform">
+          <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl p-5 text-white shadow-xl">
             <div className="flex items-center justify-between mb-2">
               <span className="text-3xl">🚚</span>
               <span className="text-sm opacity-80">النشطة</span>
@@ -247,7 +273,7 @@ export default function DeliveryDashboard() {
             <p className="text-sm opacity-80 mt-1">قيد التوصيل</p>
           </div>
 
-          <div className="bg-gradient-to-br from-green-600 to-green-800 rounded-2xl p-5 text-white shadow-xl transform hover:scale-105 transition-transform">
+          <div className="bg-gradient-to-br from-green-600 to-green-800 rounded-2xl p-5 text-white shadow-xl">
             <div className="flex items-center justify-between mb-2">
               <span className="text-3xl">✅</span>
               <span className="text-sm opacity-80">المكتملة</span>
@@ -256,10 +282,10 @@ export default function DeliveryDashboard() {
             <p className="text-sm opacity-80 mt-1">تم التسليم</p>
           </div>
 
-          <div className="bg-gradient-to-br from-pink-600 to-pink-800 rounded-2xl p-5 text-white shadow-xl transform hover:scale-105 transition-transform">
+          <div className="bg-gradient-to-br from-pink-600 to-pink-800 rounded-2xl p-5 text-white shadow-xl">
             <div className="flex items-center justify-between mb-2">
               <span className="text-3xl">💰</span>
-              <span className="text-sm opacity-80">المبيعات</span>
+              <span className="text-sm opacity-80">الأرباح</span>
             </div>
             <p className="text-3xl font-black">{stats.revenue.toLocaleString()}</p>
             <p className="text-sm opacity-80 mt-1">ج.م</p>
@@ -271,7 +297,7 @@ export default function DeliveryDashboard() {
             onClick={() => setActiveTab("all")}
             className={`px-6 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${
               activeTab === "all"
-           ? "bg-purple-600 text-white shadow-lg scale-105"
+             ? "bg-purple-600 text-white shadow-lg scale-105"
                 : "bg-white/10 text-gray-300 hover:bg-white/20"
             }`}
           >
@@ -281,7 +307,7 @@ export default function DeliveryDashboard() {
             onClick={() => setActiveTab("active")}
             className={`px-6 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${
               activeTab === "active"
-           ? "bg-blue-600 text-white shadow-lg scale-105"
+             ? "bg-blue-600 text-white shadow-lg scale-105"
                 : "bg-white/10 text-gray-300 hover:bg-white/20"
             }`}
           >
@@ -291,7 +317,7 @@ export default function DeliveryDashboard() {
             onClick={() => setActiveTab("completed")}
             className={`px-6 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${
               activeTab === "completed"
-           ? "bg-green-600 text-white shadow-lg scale-105"
+             ? "bg-green-600 text-white shadow-lg scale-105"
                 : "bg-white/10 text-gray-300 hover:bg-white/20"
             }`}
           >
@@ -307,11 +333,13 @@ export default function DeliveryDashboard() {
         ) : (
           <div className="grid gap-6">
             {sortedAndFilteredOrders.map((order) => {
-              const config = getStatusConfig(order.status);
-              const nextStatus = getNextStatus(order.status);
-              const progress = getProgress(order.status);
-              const isDone = order.status === FINAL_STATUS || order.status === "تم التسليم";
+              const config = getStatusConfig(order.delivery_status);
+              const nextStatus = getNextStatus(order.delivery_status);
+              const progress = getProgress(order.delivery_status);
+              const isDone = order.delivery_status === FINAL_STATUS;
               const isUpdating = updatingId === order.id;
+              const itemsTotal = getOrderItemsTotal(order);
+              const orderTotal = getOrderTotal(order);
 
               return (
                 <div
@@ -332,7 +360,7 @@ export default function DeliveryDashboard() {
                   <div className="flex flex-wrap items-start justify-between gap-4 mb-6 pb-6 border-b">
                     <div>
                       <h2 className="text-3xl font-black text-gray-900 mb-2">
-                        طلب #{order.order_number || order.id.slice(0, 8)}
+                        طلب #{order.id}
                       </h2>
                       <p className="text-gray-500 text-sm">
                         {order.created_at? new Date(order.created_at).toLocaleString('ar-EG') : 'بدون تاريخ'}
@@ -348,8 +376,8 @@ export default function DeliveryDashboard() {
                     <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 border-2 border-purple-300">
                       <p className="text-sm text-purple-700 font-bold mb-1">🏪 اسم المحل</p>
                       <p className="font-black text-gray-900 text-xl">{getShopName(order)}</p>
-                      {order.shop_phone && (
-                        <p className="text-sm text-gray-600 mt-1" dir="ltr">{order.shop_phone}</p>
+                      {order.shops?.phone && (
+                        <p className="text-sm text-gray-600 mt-1" dir="ltr">{order.shops.phone}</p>
                       )}
                     </div>
 
@@ -380,10 +408,12 @@ export default function DeliveryDashboard() {
 
                     <div className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-xl p-4 border-2 border-pink-300">
                       <p className="text-sm text-pink-700 font-bold mb-1">💰 الإجمالي</p>
-                      <p className="font-black text-gray-900 text-3xl">{order.total || 0} ج.م</p>
-                      <p className="text-xs text-gray-600 mt-1">
-                        {order.subtotal && `المنتجات: ${order.subtotal} + التوصيل: ${order.delivery_fee || 0}`}
+                      <p className="font-black text-gray-900 text-3xl">
+                        {orderTotal.toLocaleString()} ج.م
                       </p>
+                      <p className="text-xs text-gray-600 mt-1">
+  المنتجات: {itemsTotal.toLocaleString()}{parseFloat(order.delivery_fee) > 0 && ` + ${parseFloat(order.delivery_fee).toLocaleString()}`}
+</p>
                     </div>
 
                     <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-4 border-2 border-orange-300 md:col-span-2">
@@ -394,47 +424,63 @@ export default function DeliveryDashboard() {
                       {order.notes && (
                         <p className="text-sm text-gray-600 mt-2 bg-white/50 p-2 rounded">📝 {order.notes}</p>
                       )}
-                      {order.payment_method && (
-                        <p className="text-sm text-gray-600 mt-1">
-                          💳 الدفع: {order.payment_method} - {order.payment_status || "معلق"}
-                        </p>
-                      )}
                     </div>
                   </div>
 
-                  {order.items && order.items.length > 0 && (
+                  {order.order_items && order.order_items.length > 0 && (
                     <div className="mb-6">
                       <h3 className="font-bold text-xl mb-3 text-gray-900">
-                        المنتجات ({order.items.length})
+                        المنتجات ({order.order_items.length})
                       </h3>
                       <div className="grid md:grid-cols-2 gap-3">
-                        {order.items.map((item, index) => (
-                          <div key={index} className="flex items-center gap-3 bg-gray-50 rounded-xl p-3 border">
-                            <img
-                              src={item.product_image || "https://via.placeholder.com/60"}
-                              className="w-16 h-16 rounded-lg object-cover"
-                              alt={item.product_name}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-bold text-gray-900 truncate">
-                                {item.product_name || "منتج"}
-                              </h4>
-                              <p className="text-xs text-gray-600">
-                                {item.quantity || 1} × {item.price || 0} ج.م
+                        {order.order_items.map((item, index) => (
+                          <div key={index} className="bg-gray-50 rounded-xl p-3 border">
+                            <div className="bg-purple-100 text-purple-800 text-xs font-bold px-2 py-1 rounded mb-2 inline-block">
+                              🏪 {getShopName(order)}
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <img
+                                src={item.products?.image_url || "https://via.placeholder.com/60"}
+                                className="w-16 h-16 rounded-lg object-cover"
+                                alt={item.products?.name}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-bold text-gray-900 truncate">
+                                  {item.products?.name || "منتج"}
+                                </h4>
+                                <p className="text-xs text-gray-600">
+                                  {item.quantity || 1} × {item.price || 0} ج.م
+                                </p>
+                              </div>
+                              <p className="font-black text-purple-700">
+                                {(item.price || 0) * (item.quantity || 1)} ج.م
                               </p>
                             </div>
-                            <p className="font-black text-purple-700">
-                              {(item.price || 0) * (item.quantity || 1)} ج.م
-                            </p>
                           </div>
                         ))}
                       </div>
                     </div>
                   )}
 
+                  {order.delivery_status === 'pending' &&!order.delivery_fee && (
+                    <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 mb-4">
+                      <p className="text-sm text-yellow-700 font-bold mb-2">💰 أدخل سعر التوصيل</p>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="سعر التوصيل"
+                          value={deliveryFee[order.id] || ''}
+                          onChange={(e) => setDeliveryFee({...deliveryFee, [order.id]: e.target.value})}
+                          className="flex-1 bg-white border border-yellow-300 rounded-lg px-4 py-2 text-gray-900"
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   {nextStatus &&!isDone && (
                     <button
-                      onClick={() => moveToNextStatus(order.id, order.status)}
+                      onClick={() => moveToNextStatus(order.id, order.delivery_status, order)}
                       disabled={isUpdating}
                       className={`
                         w-full flex items-center justify-center gap-3 px-6 py-5 rounded-xl font-black text-2xl
@@ -460,7 +506,7 @@ export default function DeliveryDashboard() {
                     <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-xl p-5 text-center text-white shadow-lg">
                       <p className="font-black text-2xl">✅ تم إنجاز الطلب بنجاح</p>
                       <p className="text-sm opacity-90 mt-1">
-                        {order.status_updated_at? new Date(order.status_updated_at).toLocaleString('ar-EG') : ''}
+                        {order.updated_at? new Date(order.updated_at).toLocaleString('ar-EG') : ''}
                       </p>
                     </div>
                   )}

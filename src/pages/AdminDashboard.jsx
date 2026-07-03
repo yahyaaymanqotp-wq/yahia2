@@ -1,35 +1,46 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { Store, Plus, X, Upload, Trash2, Lock, ClipboardList, CheckCircle, XCircle, Eye } from 'lucide-react'
+import { Store, Truck, Package, Upload, LogOut, Plus, X, Edit, Trash2, DollarSign, TrendingUp, BarChart3 } from 'lucide-react'
 
-const ADMIN_PASSWORD = 'youssef2024'
-
-function AdminDashboard() {
+export default function AdminDashboard() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(true)
   const [shops, setShops] = useState([])
   const [categories, setCategories] = useState([])
-  const [orders, setOrders] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [showAdd, setShowAdd] = useState(false)
-  const [uploadingImage, setUploadingImage] = useState(false)
+  const [deliveryCompanies, setDeliveryCompanies] = useState([])
+  const [stats, setStats] = useState({ shops: 0, companies: 0, orders: 0 })
+  const [shopSales, setShopSales] = useState({})
+  const [companyEarnings, setCompanyEarnings] = useState({})
+
+  const [showAddShop, setShowAddShop] = useState(false)
+  const [showAddCompany, setShowAddCompany] = useState(false)
+  const [editingCompany, setEditingCompany] = useState(null)
   const [submitting, setSubmitting] = useState(false)
-  const [activeTab, setActiveTab] = useState('shops')
-  const [selectedOrder, setSelectedOrder] = useState(null)
-  const [formData, setFormData] = useState({
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' })
+  const [shopForm, setShopForm] = useState({
     name: '',
-    category: '',
+    category_id: '',
     description: '',
     address: '',
     phone: '',
-    image_url: '',
-    ownerUsername: '',
-    ownerPassword: '',
-    ownerFullName: ''
+    logo_url: '',
+    cover_image_url: '',
+    username: '',
+    password: ''
+  })
+  const [companyForm, setCompanyForm] = useState({
+    name: '',
+    phone: '',
+    address: '',
+    username: '',
+    password: ''
   })
 
   useEffect(() => {
-    if (localStorage.getItem('admin_access') === 'true') {
+    const role = localStorage.getItem('user_role')
+    if (role === 'admin') {
       setIsLoggedIn(true)
       loadData()
     } else {
@@ -37,31 +48,92 @@ function AdminDashboard() {
     }
   }, [])
 
-  function handleLogin(e) {
-    e.preventDefault()
-    if (password === ADMIN_PASSWORD) {
-      localStorage.setItem('admin_access', 'true')
-      setIsLoggedIn(true)
-      loadData()
-    } else {
-      alert('الباسورد غلط')
+  useEffect(() => {
+    if (categories.length > 0 &&!shopForm.category_id) {
+      setShopForm(prev => ({...prev, category_id: categories[0].id }))
+    }
+  }, [categories])
+
+  async function loadData() {
+    try {
+      const [shopsRes, catsRes, companiesRes, ordersRes] = await Promise.all([
+        supabase.from('shops').select('*, categories(name)').order('created_at', { ascending: false }),
+        supabase.from('categories').select('*').order('display_order'),
+        supabase.from('delivery_companies').select('*').order('created_at', { ascending: false }),
+        supabase.from('orders').select('id, shop_id, delivery_company_id, total_amount, delivery_fee, delivery_status')
+      ])
+
+      setShops(shopsRes.data || [])
+      setCategories(catsRes.data || [])
+      setDeliveryCompanies(companiesRes.data || [])
+      setStats({
+        shops: shopsRes.data?.length || 0,
+        companies: companiesRes.data?.length || 0,
+        orders: ordersRes.data?.length || 0
+      })
+
+      // حساب مبيعات كل محل
+      const salesByShop = {}
+      const earningsByCompany = {}
+
+      ordersRes.data?.forEach(order => {
+        if (order.delivery_status === 'delivered') {
+          // مبيعات المحلات
+          if (order.shop_id) {
+            if (!salesByShop[order.shop_id]) {
+              salesByShop[order.shop_id] = { total: 0, count: 0 }
+            }
+            salesByShop[order.shop_id].total += parseFloat(order.total_amount || 0)
+            salesByShop[order.shop_id].count += 1
+          }
+
+          // أرباح شركات التوصيل
+          if (order.delivery_company_id) {
+            if (!earningsByCompany[order.delivery_company_id]) {
+              earningsByCompany[order.delivery_company_id] = { total: 0, count: 0 }
+            }
+            earningsByCompany[order.delivery_company_id].total += parseFloat(order.delivery_fee || 0)
+            earningsByCompany[order.delivery_company_id].count += 1
+          }
+        }
+      })
+
+      setShopSales(salesByShop)
+      setCompanyEarnings(earningsByCompany)
+
+    } catch (error) {
+      console.error('Error loading data:', error)
+    } finally {
+      setLoading(false)
     }
   }
 
-  async function loadData() {
-    const [catsRes, shopsRes, ordersRes] = await Promise.all([
-      supabase.from('categories').select('*').order('display_order'),
-      supabase.from('shops').select('*').order('created_at', { ascending: false }),
-      supabase.from('orders').select('*, shops(name)').order('created_at', { ascending: false })
-    ])
+  async function handleLogin(e) {
+    e.preventDefault()
+    try {
+      const { data, error } = await supabase
+   .from('admins')
+   .select('*')
+   .eq('username', loginForm.username)
+   .eq('password', loginForm.password)
+   .eq('is_active', true)
+   .single()
 
-    if (catsRes.data) setCategories(catsRes.data)
-    if (shopsRes.data) setShops(shopsRes.data)
-    if (ordersRes.data) setOrders(ordersRes.data)
-    setLoading(false)
+      if (error ||!data) {
+        alert('بيانات الدخول غير صحيحة')
+        return
+      }
+
+      localStorage.setItem('user_role', 'admin')
+      localStorage.setItem('admin_id', data.id)
+      setIsLoggedIn(true)
+      loadData()
+    } catch (error) {
+      alert('خطأ في تسجيل الدخول')
+    }
   }
 
-  async function handleImageUpload(e) {
+  async function handleLogoUpload(e) {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -70,118 +142,87 @@ function AdminDashboard() {
       return
     }
 
-    setUploadingImage(true)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('حجم الصورة كبير - الحد الأقصى 5MB')
+      return
+    }
 
+    setUploadingLogo(true)
     try {
       const fileExt = file.name.split('.').pop()
-      const fileName = `shops/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+      const filePath = `shops/${fileName}`
 
       const { error: uploadError } = await supabase.storage
-   .from('shops')
-   .upload(fileName, file)
+   .from('shop-images')
+   .upload(filePath, file)
 
       if (uploadError) throw uploadError
 
       const { data: { publicUrl } } = supabase.storage
-   .from('shops')
-   .getPublicUrl(fileName)
+   .from('shop-images')
+   .getPublicUrl(filePath)
 
-      setFormData({...formData, image_url: publicUrl })
+      setShopForm(prev => ({...prev, logo_url: publicUrl }))
     } catch (error) {
-      console.error('Error uploading image:', error)
+      console.error('Upload error:', error)
       alert('فشل رفع الصورة: ' + error.message)
     } finally {
-      setUploadingImage(false)
+      setUploadingLogo(false)
     }
   }
 
   async function handleAddShop(e) {
     e.preventDefault()
 
-    if (!formData.name ||!formData.category ||!formData.ownerUsername ||!formData.ownerPassword) {
-      alert('املأ اسم المحل والقسم واليوزرنيم والباسورد')
+    if (!shopForm.name.trim() ||!shopForm.category_id ||!shopForm.username.trim() ||!shopForm.password.trim()) {
+      alert('املأ الحقول المطلوبة: الاسم، القسم، اليوزرنيم، الباسورد')
       return
     }
-
-    if (formData.ownerPassword.length < 6) {
+    if (shopForm.password.length < 6) {
       alert('الباسورد لازم 6 حروف على الأقل')
       return
     }
 
     setSubmitting(true)
-
     try {
-      // 1. انشئ المحل
-      const { data: shopData, error: shopError } = await supabase
-   .from('shops')
-   .insert({
-          name: formData.name,
-          category: formData.category,
-          description: formData.description || null,
-          address: formData.address || null,
-          phone: formData.phone || null,
-          image_url: formData.image_url || null,
-          is_active: true
-        })
-   .select()
-   .single()
+      const { data, error } = await supabase.from('shops').insert({
+        name: shopForm.name.trim(),
+        category_id: shopForm.category_id,
+        description: shopForm.description.trim() || null,
+        address: shopForm.address.trim() || null,
+        phone: shopForm.phone.trim() || null,
+        logo_url: shopForm.logo_url || null,
+        cover_image_url: shopForm.cover_image_url || null,
+        username: shopForm.username.trim(),
+        password: shopForm.password,
+        is_active: true,
+        is_verified: true,
+        rating: 5.0
+      }).select()
 
-      if (shopError) throw shopError
-
-      // 2. انشئ حساب لصاحب المحل
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: `${formData.ownerUsername}@local.app`,
-        password: formData.ownerPassword,
-        options: {
-          data: {
-            username: formData.ownerUsername,
-            full_name: formData.ownerFullName || formData.name,
-            role: 'shop_owner'
-          }
-        }
-      })
-
-      if (authError) {
-        await supabase.from('shops').delete().eq('id', shopData.id)
-        if (authError.message.includes('already registered')) {
+      if (error) {
+        if (error.code === '23505') {
           throw new Error('اليوزرنيم ده موجود بالفعل')
         }
-        throw authError
+        throw error
       }
 
-      if (!authData.user) throw new Error('فشل إنشاء الحساب')
+      alert(`✅ تم إضافة المحل بنجاح!\n\nاسم المحل: ${shopForm.name}\nاليوزرنيم: ${shopForm.username}\nالباسورد: ${shopForm.password}`)
 
-      // 3. اربط المحل باليوزر
-      await supabase
-   .from('shops')
-   .update({ owner_id: authData.user.id })
-   .eq('id', shopData.id)
-
-      // 4. حدث الـ profile
-      await supabase
-   .from('profiles')
-   .update({
-          role: 'shop_owner',
-          shop_id: shopData.id
-        })
-   .eq('id', authData.user.id)
-
-      alert(`✅ تم إضافة المحل والحساب بنجاح!\n\nاسم المحل: ${formData.name}\nاليوزرنيم: ${formData.ownerUsername}\nالباسورد: ${formData.ownerPassword}`)
-
-      setFormData({
+      setShopForm({
         name: '',
-        category: '',
+        category_id: categories[0]?.id || '',
         description: '',
         address: '',
         phone: '',
-        image_url: '',
-        ownerUsername: '',
-        ownerPassword: '',
-        ownerFullName: ''
+        logo_url: '',
+        cover_image_url: '',
+        username: '',
+        password: ''
       })
-      setShowAdd(false)
+      setShowAddShop(false)
       loadData()
-
     } catch (error) {
       console.error('Error:', error)
       alert('خطأ: ' + error.message)
@@ -190,46 +231,146 @@ function AdminDashboard() {
     }
   }
 
-  async function deleteShop(id) {
-    if (!confirm('متأكد من الحذف؟')) return
-    await supabase.from('shops').delete().eq('id', id)
-    loadData()
-  }
+  async function handleAddCompany(e) {
+    e.preventDefault()
 
-  async function updateOrderStatus(orderId, newStatus) {
-    const { error } = await supabase
- .from('orders')
- .update({ status: newStatus })
- .eq('id', orderId)
-
-    if (error) {
-      alert('فشل تحديث الطلب')
+    if (!companyForm.name.trim() ||!companyForm.username.trim() ||!companyForm.password.trim()) {
+      alert('املأ الحقول المطلوبة')
       return
     }
 
-    loadData()
-    setSelectedOrder(null)
+    if (companyForm.password.length < 6) {
+      alert('الباسورد لازم 6 حروف على الأقل')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      if (editingCompany) {
+        const { error } = await supabase.from('delivery_companies').update({
+          name: companyForm.name.trim(),
+          phone: companyForm.phone.trim() || null,
+          address: companyForm.address.trim() || null,
+          username: companyForm.username.trim(),
+          password: companyForm.password
+        }).eq('id', editingCompany.id)
+
+        if (error) throw error
+        alert('✅ تم تحديث الشركة')
+      } else {
+        const { error } = await supabase.from('delivery_companies').insert({
+          name: companyForm.name.trim(),
+          phone: companyForm.phone.trim() || null,
+          address: companyForm.address.trim() || null,
+          username: companyForm.username.trim(),
+          password: companyForm.password,
+          is_active: true
+        })
+
+        if (error) {
+          if (error.code === '23505') {
+            throw new Error('اليوزرنيم ده موجود بالفعل')
+          }
+          throw error
+        }
+        alert(`✅ تم إضافة شركة التوصيل!\n\nالاسم: ${companyForm.name}\nاليوزرنيم: ${companyForm.username}\nالباسورد: ${companyForm.password}`)
+      }
+
+      resetCompanyForm()
+      loadData()
+    } catch (error) {
+      alert('خطأ: ' + error.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  function resetCompanyForm() {
+    setCompanyForm({ name: '', phone: '', address: '', username: '', password: '' })
+    setShowAddCompany(false)
+    setEditingCompany(null)
+  }
+
+  function handleEditCompany(company) {
+    setEditingCompany(company)
+    setCompanyForm({
+      name: company.name,
+      phone: company.phone || '',
+      address: company.address || '',
+      username: company.username,
+      password: company.password
+    })
+    setShowAddCompany(true)
+  }
+
+  async function toggleShopStatus(shopId, currentStatus) {
+    try {
+      await supabase.from('shops').update({ is_active:!currentStatus }).eq('id', shopId)
+      loadData()
+    } catch (error) {
+      alert('خطأ في تحديث الحالة')
+    }
+  }
+
+  async function toggleCompanyStatus(companyId, currentStatus) {
+    try {
+      await supabase.from('delivery_companies').update({ is_active:!currentStatus }).eq('id', companyId)
+      loadData()
+    } catch (error) {
+      alert('خطأ في تحديث الحالة')
+    }
+  }
+
+  async function handleDeleteCompany(companyId) {
+    if (!confirm('متأكد عايز تمسح شركة التوصيل؟')) return
+    const { error } = await supabase.from('delivery_companies').delete().eq('id', companyId)
+    if (error) {
+      alert('خطأ في المسح: ' + error.message)
+    } else {
+      loadData()
+    }
+  }
+
+  function handleLogout() {
+    localStorage.clear()
+    window.location.href = '/login'
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#121212] flex items-center justify-center">
+        <div className="text-[#D4AF37] text-xl">جاري التحميل...</div>
+      </div>
+    )
   }
 
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-[#121212] flex items-center justify-center p-4" dir="rtl">
-        <div className="bg-[#1E1E1E] rounded-2xl p-8 max-w-md w-full border border-[#333]">
-          <div className="text-center mb-6">
-            <Lock className="mx-auto text-[#D4AF37] mb-4" size={48} />
-            <h1 className="text-2xl font-bold text-white">لوحة تحكم الأدمن</h1>
-          </div>
-          <form onSubmit={handleLogin}>
+        <div className="w-full max-w-md bg-[#1E1E1E] border border-[#333] rounded-2xl p-6 md:p-8">
+          <h1 className="text-2xl md:text-3xl font-bold text-[#D4AF37] mb-6 text-center">لوحة تحكم الأدمن</h1>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <input
+              type="text"
+              placeholder="اسم المستخدم"
+              value={loginForm.username}
+              onChange={(e) => setLoginForm({...loginForm, username: e.target.value})}
+              className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3 text-white focus:border-[#D4AF37] focus:outline-none"
+              required
+            />
             <input
               type="password"
-              placeholder="الباسورد"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3 text-white mb-4"
-              autoFocus
+              placeholder="كلمة المرور"
+              value={loginForm.password}
+              onChange={(e) => setLoginForm({...loginForm, password: e.target.value})}
+              className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3 text-white focus:border-[#D4AF37] focus:outline-none"
+              required
             />
-            <button type="submit" className="w-full bg-[#D4AF37] text-black px-6 py-3 rounded-xl font-bold">
-              دخول
+            <button
+              type="submit"
+              className="w-full bg-[#D4AF37] text-black py-3 rounded-xl font-bold hover:bg-[#D4AF37]/90"
+            >
+              تسجيل الدخول
             </button>
           </form>
         </div>
@@ -237,289 +378,292 @@ function AdminDashboard() {
     )
   }
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center bg-[#121212] text-white text-xl">جاري التحميل...</div>
-  }
-
   return (
-    <div className="min-h-screen bg-[#121212] p-4 md:p-8" dir="rtl">
+    <div className="min-h-screen bg-[#121212] text-white p-4 md:p-6" dir="rtl">
       <div className="max-w-7xl mx-auto">
-
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-[#D4AF37] mb-2">لوحة التحكم</h1>
-            <p className="text-gray-400">إدارة المحلات والطلبات</p>
-          </div>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 md:mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold text-[#D4AF37]">لوحة تحكم الأدمن</h1>
           <button
-            onClick={() => {
-              localStorage.removeItem('admin_access')
-              setIsLoggedIn(false)
-            }}
-            className="bg-red-500/20 text-red-400 px-6 py-2 rounded-lg font-bold"
+            onClick={handleLogout}
+            className="bg-red-500/20 text-red-400 px-4 md:px-6 py-2 rounded-lg font-bold flex items-center gap-2 w-full md:w-auto justify-center"
           >
+            <LogOut size={18} />
             خروج
           </button>
         </div>
 
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-          <button
-            onClick={() => setActiveTab('shops')}
-            className={`px-6 py-3 rounded-xl font-bold transition flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'shops'
-          ? 'bg-[#D4AF37] text-black'
-                : 'bg-[#1E1E1E] text-gray-400 hover:bg-[#2a2a2a]'
-            }`}
-          >
-            <Store size={20} />
-            المحلات ({shops.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('orders')}
-            className={`px-6 py-3 rounded-xl font-bold transition flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'orders'
-          ? 'bg-[#D4AF37] text-black'
-                : 'bg-[#1E1E1E] text-gray-400 hover:bg-[#2a2a2a]'
-            }`}
-          >
-            <ClipboardList size={20} />
-            الطلبات ({orders.length})
-          </button>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
+          <div className="bg-[#1E1E1E] border border-[#333] rounded-2xl p-4 md:p-6">
+            <div className="flex items-center gap-3 mb-2">
+              <Store className="text-[#D4AF37]" />
+              <h3 className="text-gray-400">المحلات</h3>
+            </div>
+            <p className="text-3xl md:text-4xl font-bold">{stats.shops}</p>
+          </div>
+          <div className="bg-[#1E1E1E] border border-[#333] rounded-2xl p-4 md:p-6">
+            <div className="flex items-center gap-3 mb-2">
+              <Truck className="text-[#D4AF37]" />
+              <h3 className="text-gray-400">شركات التوصيل</h3>
+            </div>
+            <p className="text-3xl md:text-4xl font-bold">{stats.companies}</p>
+          </div>
+          <div className="bg-[#1E1E1E] border border-[#333] rounded-2xl p-4 md:p-6">
+            <div className="flex items-center gap-3 mb-2">
+              <Package className="text-[#D4AF37]" />
+              <h3 className="text-gray-400">الطلبات</h3>
+            </div>
+            <p className="text-3xl md:text-4xl font-bold">{stats.orders}</p>
+          </div>
         </div>
 
-        {activeTab === 'shops' && (
-          <>
-            <button
-              onClick={() => setShowAdd(true)}
-              className="bg-[#D4AF37] text-black px-6 py-3 rounded-xl font-bold mb-6 flex items-center gap-2"
-            >
-              <Plus size={20} />
-              إضافة محل جديد
-            </button>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+          <div className="bg-[#1E1E1E] border border-[#333] rounded-2xl p-4 md:p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl md:text-2xl font-bold">المحلات</h2>
+              <button
+                onClick={() => setShowAddShop(true)}
+                className="bg-[#D4AF37] text-black px-3 md:px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm md:text-base"
+              >
+                <Plus size={18} />
+                إضافة محل
+              </button>
+            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-3 max-h-[500px] overflow-y-auto">
               {shops.map(shop => (
-                <div key={shop.id} className="bg-[#1E1E1E] rounded-xl p-6 border border-[#333] hover:border-[#D4AF37]/50 transition">
-                  {shop.image_url? (
-                    <img src={shop.image_url} alt={shop.name} className="w-full h-40 object-cover rounded-lg mb-4" />
-                  ) : (
-                    <div className="w-full h-40 bg-[#121212] rounded-lg mb-4 flex items-center justify-center">
-                      <Store className="text-gray-600" size={48} />
+                <div key={shop.id} className="bg-[#121212] rounded-xl p-3 md:p-4">
+                  <div className="flex items-center gap-3 md:gap-4 mb-3">
+                    {shop.logo_url && (
+                      <img src={shop.logo_url} className="w-10 h-10 md:w-12 md:h-12 rounded-lg object-cover flex-shrink-0" alt="" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold truncate">{shop.name}</p>
+                      <p className="text-xs md:text-sm text-gray-400">{shop.categories?.name}</p>
+                      <p className="text-xs text-gray-500 truncate">@{shop.username}</p>
                     </div>
-                  )}
-                  <h3 className="text-xl font-bold text-white mb-2">{shop.name}</h3>
-                  <p className="text-[#D4AF37] text-sm mb-2">
-                    {categories.find(c => c.slug === shop.category)?.name || shop.category}
-                  </p>
-                  {shop.description && <p className="text-gray-400 text-sm mb-4 line-clamp-2">{shop.description}</p>}
-
-                  <button
-                    onClick={() => deleteShop(shop.id)}
-                    className="w-full bg-red-500/20 text-red-400 px-4 py-2 rounded-lg flex items-center justify-center gap-2"
-                  >
-                    <Trash2 size={18} />
-                    حذف
-                  </button>
+                    <button
+                      onClick={() => toggleShopStatus(shop.id, shop.is_active)}
+                      className={`px-2 md:px-3 py-1 rounded-lg text-xs md:text-sm font-bold flex-shrink-0 ${
+                        shop.is_active
+                 ? 'bg-green-500/20 text-green-400'
+                        : 'bg-red-500/20 text-red-400'
+                      }`}
+                    >
+                      {shop.is_active? 'نشط' : 'موقوف'}
+                    </button>
+                  </div>
+                  {/* كرت إجمالي المبيعات */}
+                  <div className="bg-[#1E1E1E] border border-[#D4AF37]/30 rounded-lg p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <DollarSign size={18} className="text-[#D4AF37]" />
+                      <span className="text-sm text-gray-400">إجمالي المبيعات</span>
+                    </div>
+                    <span className="text-lg font-bold text-[#D4AF37]">
+                      {(shopSales[shop.id]?.total || 0).toLocaleString('ar-EG')} ج.م
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
+          </div>
 
-            {shops.length === 0 && (
-              <div className="text-center py-12 bg-[#1E1E1E] rounded-xl border border-[#333]">
-                <Store className="mx-auto text-gray-600 mb-4" size={48} />
-                <p className="text-gray-400">لا توجد محلات</p>
-              </div>
-            )}
-          </>
-        )}
-
-        {activeTab === 'orders' && (
-          <div className="bg-[#1E1E1E] rounded-xl border border-[#333] overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-[#121212]">
-                  <tr>
-                    <th className="text-right p-4 text-gray-400 font-bold">رقم الطلب</th>
-                    <th className="text-right p-4 text-gray-400 font-bold">المحل</th>
-                    <th className="text-right p-4 text-gray-400 font-bold">العميل</th>
-                    <th className="text-right p-4 text-gray-400 font-bold">الإجمالي</th>
-                    <th className="text-right p-4 text-gray-400 font-bold">الحالة</th>
-                    <th className="text-right p-4 text-gray-400 font-bold">التاريخ</th>
-                    <th className="text-right p-4 text-gray-400 font-bold">إجراءات</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map(order => (
-                    <tr key={order.id} className="border-t border-[#333] hover:bg-[#121212]/50">
-                      <td className="p-4 text-white">#{order.id.slice(0, 8)}</td>
-                      <td className="p-4 text-white">{order.shops?.name || 'غير محدد'}</td>
-                      <td className="p-4 text-gray-400">{order.customer_name}</td>
-                      <td className="p-4 text-[#D4AF37] font-bold">{order.total_amount} ج.م</td>
-                      <td className="p-4">
-                        <span className={`px-3 py-1 rounded-lg text-xs font-bold ${
-                          order.status === 'completed'? 'bg-green-500/20 text-green-400' :
-                          order.status === 'cancelled'? 'bg-red-500/20 text-red-400' :
-                          order.status === 'preparing'? 'bg-blue-500/20 text-blue-400' :
-                          'bg-yellow-500/20 text-yellow-400'
-                        }`}>
-                          {order.status === 'pending'? 'قيد الانتظار' :
-                           order.status === 'preparing'? 'قيد التحضير' :
-                           order.status === 'completed'? 'مكتمل' :
-                           order.status === 'cancelled'? 'ملغي' : order.status}
-                        </span>
-                      </td>
-                      <td className="p-4 text-gray-400 text-sm">
-                        {new Date(order.created_at).toLocaleDateString('ar-EG')}
-                      </td>
-                      <td className="p-4">
-                        <button
-                          onClick={() => setSelectedOrder(order)}
-                          className="bg-[#D4AF37]/20 text-[#D4AF37] px-4 py-2 rounded-lg flex items-center gap-2"
-                        >
-                          <Eye size={16} />
-                          عرض
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div className="bg-[#1E1E1E] border border-[#333] rounded-2xl p-4 md:p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl md:text-2xl font-bold">شركات التوصيل</h2>
+              <button
+                onClick={() => setShowAddCompany(true)}
+                className="bg-[#D4AF37] text-black px-3 md:px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm md:text-base"
+              >
+                <Plus size={18} />
+                إضافة شركة
+              </button>
             </div>
 
-            {orders.length === 0 && (
-              <div className="text-center py-12">
-                <ClipboardList className="mx-auto text-gray-600 mb-4" size={48} />
-                <p className="text-gray-400">لا توجد طلبات</p>
-              </div>
-            )}
+            <div className="space-y-3 max-h-[500px] overflow-y-auto">
+              {deliveryCompanies.map(company => (
+                <div key={company.id} className="bg-[#121212] rounded-xl p-3 md:p-4">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold truncate">{company.name}</p>
+                      <p className="text-xs md:text-sm text-gray-400 truncate">@{company.username}</p>
+                      {company.phone && <p className="text-xs md:text-sm text-gray-400">{company.phone}</p>}
+                      {company.address && <p className="text-xs text-gray-500 truncate">{company.address}</p>}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={() => toggleCompanyStatus(company.id, company.is_active)}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold ${
+                          company.is_active
+                     ? 'bg-green-500/20 text-green-400'
+                            : 'bg-red-500/20 text-red-400'
+                        }`}
+                      >
+                        {company.is_active? 'نشط' : 'موقوف'}
+                      </button>
+                      <button
+                        onClick={() => handleEditCompany(company)}
+                        className="flex items-center justify-center gap-1 bg-[#D4AF37]/20 text-[#D4AF37] px-3 py-1 rounded-lg hover:bg-[#D4AF37]/30 transition text-xs"
+                      >
+                        <Edit size={12} />
+                        تعديل
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCompany(company.id)}
+                        className="flex items-center justify-center gap-1 bg-red-500/20 text-red-500 px-3 py-1 rounded-lg hover:bg-red-500/30 transition text-xs"
+                      >
+                        <Trash2 size={12} />
+                        حذف
+                      </button>
+                    </div>
+                  </div>
+                  {/* كرت الأرباح وعدد الطلبات */}
+                  <div className="bg-[#1E1E1E] border border-[#D4AF37]/30 rounded-lg p-3 mt-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp size={18} className="text-[#D4AF37]" />
+                        <span className="text-sm text-gray-400">الأرباح</span>
+                      </div>
+                      <span className="text-lg font-bold text-[#D4AF37]">
+                        {(companyEarnings[company.id]?.total || 0).toLocaleString('ar-EG')} ج.م
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Package size={18} className="text-gray-400" />
+                        <span className="text-sm text-gray-400">عدد الطلبات</span>
+                      </div>
+                      <span className="text-lg font-bold text-white">
+                        {companyEarnings[company.id]?.count || 0}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {deliveryCompanies.length === 0 && (
+                <div className="text-center py-8 text-gray-400">
+                  <Truck size={40} className="mx-auto mb-2 opacity-50" />
+                  <p>لسه مضفتش شركات توصيل</p>
+                </div>
+              )}
+            </div>
           </div>
-        )}
+        </div>
 
-        {showAdd && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 overflow-y-auto">
-            <div className="bg-[#1E1E1E] rounded-2xl p-6 max-w-lg w-full border border-[#333] my-8">
-              <div className="flex justify-between mb-6">
-                <h2 className="text-2xl font-bold text-[#D4AF37]">إضافة محل جديد</h2>
-                <button onClick={() => setShowAdd(false)}><X className="text-gray-400" size={24} /></button>
+        {showAddShop && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <div className="bg-[#1E1E] border border-[#333] rounded-2xl p-6 md:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl md:text-2xl font-bold text-[#D4AF37]">إضافة محل جديد</h2>
+                <button onClick={() => setShowAddShop(false)}><X size={24} /></button>
               </div>
 
               <form onSubmit={handleAddShop} className="space-y-4">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">صورة المحل *</label>
-                  <label className="w-full bg-[#121212] border border-[#333] border-dashed rounded-xl px-4 py-8 cursor-pointer hover:border-[#D4AF37] transition flex flex-col items-center justify-center gap-2">
-                    {uploadingImage? (
-                      <span className="text-[#D4AF37]">جاري الرفع...</span>
-                    ) : formData.image_url? (
-                      <>
-                        <img src={formData.image_url} alt="Preview" className="w-32 h-32 rounded-lg object-cover" />
-                        <span className="text-sm text-gray-400">اضغط لتغيير الصورة</span>
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="text-gray-400" size={32} />
-                        <span className="text-gray-400">اضغط لاختيار صورة من التلفون</span>
-                        <span className="text-xs text-gray-500">أي حجم</span>
-                      </>
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                      disabled={uploadingImage}
-                    />
-                  </label>
-                </div>
-
                 <input
                   type="text"
                   placeholder="اسم المحل *"
+                  value={shopForm.name}
+                  onChange={(e) => setShopForm({...shopForm, name: e.target.value})}
+                  className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3"
                   required
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3 text-white"
                 />
 
                 <select
+                  value={shopForm.category_id}
+                  onChange={(e) => setShopForm({...shopForm, category_id: e.target.value})}
+                  className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3"
                   required
-                  value={formData.category}
-                  onChange={(e) => setFormData({...formData, category: e.target.value})}
-                  className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3 text-white"
                 >
-                  <option value="">-- اختر القسم ({categories.length} متاح) --</option>
+                  <option value="">اختر القسم *</option>
                   {categories.map(cat => (
-                    <option key={cat.id} value={cat.slug}>{cat.name}</option>
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
                   ))}
                 </select>
 
                 <textarea
-                  placeholder="وصف المحل"
-                  value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3 text-white"
+                  placeholder="الوصف"
+                  value={shopForm.description}
+                  onChange={(e) => setShopForm({...shopForm, description: e.target.value})}
+                  className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3"
                   rows="3"
                 />
 
                 <input
                   type="text"
                   placeholder="العنوان"
-                  value={formData.address}
-                  onChange={(e) => setFormData({...formData, address: e.target.value})}
-                  className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3 text-white"
+                  value={shopForm.address}
+                  onChange={(e) => setShopForm({...shopForm, address: e.target.value})}
+                  className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3"
                 />
 
                 <input
                   type="tel"
-                  placeholder="الهاتف"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                  className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3 text-white"
+                  placeholder="رقم الهاتف"
+                  value={shopForm.phone}
+                  onChange={(e) => setShopForm({...shopForm, phone: e.target.value})}
+                  className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3"
                 />
 
-                <div className="border-t border-[#333] pt-4">
-                  <h3 className="text-lg font-bold text-[#D4AF37] mb-4">بيانات صاحب المحل</h3>
-
-                  <input
-                    type="text"
-                    placeholder="اسم صاحب المحل"
-                    value={formData.ownerFullName}
-                    onChange={(e) => setFormData({...formData, ownerFullName: e.target.value})}
-                    className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3 text-white mb-4"
-                  />
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input
-                      type="text"
-                      placeholder="اليوزرنيم *"
-                      required
-                      value={formData.ownerUsername}
-                      onChange={(e) => setFormData({...formData, ownerUsername: e.target.value})}
-                      className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3 text-white"
-                    />
-
-                    <input
-                      type="text"
-                      placeholder="الباسورد *"
-                      required
-                      value={formData.ownerPassword}
-                      onChange={(e) => setFormData({...formData, ownerPassword: e.target.value})}
-                      className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3 text-white"
-                      minLength={6}
-                    />
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">لوجو المحل</label>
+                  <div className="flex items-center gap-4">
+                    {shopForm.logo_url && (
+                      <img src={shopForm.logo_url} className="w-16 h-16 md:w-20 md:h-20 rounded-lg object-cover" alt="" />
+                    )}
+                    <label className="flex-1 cursor-pointer">
+                      <div className="bg-[#121212] border border-[#333] border-dashed rounded-xl px-4 py-3 text-center hover:border-[#D4AF37] transition">
+                        {uploadingLogo? (
+                          <span className="text-[#D4AF37]">جاري الرفع...</span>
+                        ) : (
+                          <span className="flex items-center justify-center gap-2 text-sm md:text-base">
+                            <Upload size={18} />
+                            اختر صورة
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoUpload}
+                        className="hidden"
+                        disabled={uploadingLogo}
+                      />
+                    </label>
                   </div>
                 </div>
 
-                <div className="flex gap-3">
+                <div className="border-t border-[#333] pt-4">
+                  <p className="text-sm text-gray-400 mb-3">بيانات الدخول للمحل</p>
+                  <input
+                    type="text"
+                    placeholder="اسم المستخدم *"
+                    value={shopForm.username}
+                    onChange={(e) => setShopForm({...shopForm, username: e.target.value})}
+                    className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3 mb-3"
+                    required
+                  />
+                  <input
+                    type="password"
+                    placeholder="كلمة المرور * (6 حروف على الأقل)"
+                    value={shopForm.password}
+                    onChange={(e) => setShopForm({...shopForm, password: e.target.value})}
+                    className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3"
+                    required
+                    minLength={6}
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
                   <button
                     type="submit"
-                    disabled={uploadingImage || submitting}
-                    className="flex-1 bg-[#D4AF37] text-black px-6 py-3 rounded-xl font-bold disabled:opacity-50"
+                    disabled={submitting || uploadingLogo}
+                    className="flex-1 bg-[#D4AF37] text-black py-3 rounded-xl font-bold hover:bg-[#D4AF37]/90 disabled:opacity-50"
                   >
                     {submitting? 'جاري الإضافة...' : 'إضافة المحل'}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setShowAdd(false)}
-                    className="px-6 py-3 rounded-xl bg-[#333] text-white font-bold"
+                    onClick={() => setShowAddShop(false)}
+                    className="flex-1 bg-[#333] text-white py-3 rounded-xl font-bold"
                   >
                     إلغاء
                   </button>
@@ -529,65 +673,81 @@ function AdminDashboard() {
           </div>
         )}
 
-        {selectedOrder && (
+        {showAddCompany && (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <div className="bg-[#1E1E1E] rounded-2xl p-6 max-w-2xl w-full border border-[#333]">
-              <div className="flex justify-between mb-6">
-                <h2 className="text-2xl font-bold text-[#D4AF37]">تفاصيل الطلب #{selectedOrder.id.slice(0, 8)}</h2>
-                <button onClick={() => setSelectedOrder(null)}><X className="text-gray-400" size={24} /></button>
+            <div className="bg-[#1E1E1E] border border-[#333] rounded-2xl p-6 md:p-8 max-w-2xl w-full">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl md:text-2xl font-bold text-[#D4AF37]">
+                  {editingCompany? 'تعديل شركة التوصيل' : 'إضافة شركة توصيل'}
+                </h2>
+                <button onClick={resetCompanyForm}><X size={24} /></button>
               </div>
 
-              <div className="space-y-4 mb-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-gray-500 text-sm">العميل</p>
-                    <p className="text-white font-bold">{selectedOrder.customer_name}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 text-sm">الهاتف</p>
-                    <p className="text-white font-bold">{selectedOrder.customer_phone}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 text-sm">الإجمالي</p>
-                    <p className="text-[#D4AF37] font-bold text-xl">{selectedOrder.total_amount} ج.م</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 text-sm">الحالة الحالية</p>
-                    <p className="text-white font-bold">{selectedOrder.status}</p>
-                  </div>
+              <form onSubmit={handleAddCompany} className="space-y-4">
+                <input
+                  type="text"
+                  placeholder="اسم الشركة *"
+                  value={companyForm.name}
+                  onChange={(e) => setCompanyForm({...companyForm, name: e.target.value})}
+                  className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3"
+                  required
+                />
+                <input
+                  type="tel"
+                  placeholder="رقم الهاتف"
+                  value={companyForm.phone}
+                  onChange={(e) => setCompanyForm({...companyForm, phone: e.target.value})}
+                  className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3"
+                />
+                <input
+                  type="text"
+                  placeholder="العنوان"
+                  value={companyForm.address}
+                  onChange={(e) => setCompanyForm({...companyForm, address: e.target.value})}
+                  className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3"
+                />
+                <div className="border-t border-[#333] pt-4">
+                  <p className="text-sm text-gray-400 mb-3">بيانات الدخول</p>
+                  <input
+                    type="text"
+                    placeholder="اسم المستخدم *"
+                    value={companyForm.username}
+                    onChange={(e) => setCompanyForm({...companyForm, username: e.target.value})}
+                    className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3 mb-3"
+                    required
+                  />
+                  <input
+                    type="password"
+                    placeholder="كلمة المرور * (6 حروف على الأقل)"
+                    value={companyForm.password}
+                    onChange={(e) => setCompanyForm({...companyForm, password: e.target.value})}
+                    className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3"
+                    required
+                    minLength={6}
+                  />
                 </div>
-              </div>
 
-              <div className="flex gap-2 flex-wrap">
-                <button
-                  onClick={() => updateOrderStatus(selectedOrder.id, 'preparing')}
-                  className="bg-blue-500/20 text-blue-400 px-4 py-2 rounded-lg flex items-center gap-2"
-                >
-                  <CheckCircle size={18} />
-                  قيد التحضير
-                </button>
-                <button
-                  onClick={() => updateOrderStatus(selectedOrder.id, 'completed')}
-                  className="bg-green-500/20 text-green-400 px-4 py-2 rounded-lg flex items-center gap-2"
-                >
-                  <CheckCircle size={18} />
-                  تم التوصيل
-                </button>
-                <button
-                  onClick={() => updateOrderStatus(selectedOrder.id, 'cancelled')}
-                  className="bg-red-500/20 text-red-400 px-4 py-2 rounded-lg flex items-center gap-2"
-                >
-                  <XCircle size={18} />
-                  إلغاء الطلب
-                </button>
-              </div>
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="flex-1 bg-[#D4AF37] text-black py-3 rounded-xl font-bold hover:bg-[#D4AF37]/90 disabled:opacity-50"
+                  >
+                    {submitting? 'جاري الحفظ...' : editingCompany? 'تحديث الشركة' : 'إضافة الشركة'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetCompanyForm}
+                    className="flex-1 bg-[#333] text-white py-3 rounded-xl font-bold"
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
-
       </div>
     </div>
   )
 }
-
-export default AdminDashboard

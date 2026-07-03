@@ -1,242 +1,221 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { Store, MapPin, Phone, Package, DollarSign, ShoppingCart, ArrowRight, Image as ImageIcon } from 'lucide-react'
+import { ShoppingCart, MapPin, Phone, ArrowRight, DollarSign, Package, ArrowLeft } from 'lucide-react'
 
 export default function ShopPage() {
   const { id } = useParams()
   const [shop, setShop] = useState(null)
   const [products, setProducts] = useState([])
-  const [cart, setCart] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
-    loadShop()
-    loadProducts()
-    // هات السلة من localStorage
-    const savedCart = JSON.parse(localStorage.getItem("cart") || "[]")
-    setCart(savedCart)
+    fetchShopData()
   }, [id])
 
-  async function loadShop() {
-    const { data, error } = await supabase
-     .from('shops')
-     .select('*, profiles!shops_owner_id_fkey(username, full_name)')
-     .eq('id', id)
-     .single()
+  async function fetchShopData() {
+    try {
+      setLoading(true)
+      setError(null)
 
-    if (error) {
-      console.error('Shop error:', error)
-    } else {
-      setShop(data)
-    }
-    setLoading(false)
-  }
+      const { data: shopData, error: shopError } = await supabase
+   .from('shops')
+   .select('*, categories(name, icon)')
+   .eq('id', id)
+   .eq('is_active', true)
+   .single()
 
-  async function loadProducts() {
-    const { data, error } = await supabase
-     .from('products')
-     .select('*')
-     .eq('shop_id', id)
-     .eq('is_active', true)
-     .order('created_at', { ascending: false })
+      if (shopError) throw new Error('المحل غير موجود')
+      if (!shopData) throw new Error('المحل غير موجود')
 
-    if (!error) {
-      // رتب: اللي بصورة الأول وكبير، اللي بدون صورة في الآخر وصغير
-      const withImage = data.filter(p => p.image_url)
-      const withoutImage = data.filter(p =>!p.image_url)
+      setShop(shopData)
+
+      const { data: productsData, error: productsError } = await supabase
+   .from('products')
+   .select('*')
+   .eq('shop_id', id)
+   .eq('is_active', true)
+   .order('created_at', { ascending: false })
+
+      if (productsError) throw productsError
+
+      const withImage = productsData?.filter(p => p.image_url) || []
+      const withoutImage = productsData?.filter(p =>!p.image_url) || []
       setProducts([...withImage,...withoutImage])
+
+    } catch (err) {
+      console.error('Error:', err)
+      setError(err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
   function addToCart(product) {
-    const currentCart = JSON.parse(localStorage.getItem("cart") || "[]")
-    const index = currentCart.findIndex((item) => item.id === product.id)
+    const cart = JSON.parse(localStorage.getItem('cart') || '[]')
+    const existing = cart.find(item => item.product_id === product.id)
 
-    if (index!== -1) {
-      currentCart[index].quantity += 1
+    if (existing) {
+      existing.quantity += 1
     } else {
-      currentCart.push({
-       ...product,
-        quantity: 1,
-        shop_id: shop.id,
+      cart.push({
+        product_id: product.id,
+        shop_id: product.shop_id,
+        name: product.name,
+        price: product.price,
+        image_url: product.image_url,
         shop_name: shop.name,
-        shop_phone: shop.phone || "",
-        shop_address: shop.address || "",
+        quantity: 1
       })
     }
 
-    localStorage.setItem("cart", JSON.stringify(currentCart))
-    setCart(currentCart)
-    alert("✅ تمت إضافة المنتج إلى السلة")
+    localStorage.setItem('cart', JSON.stringify(cart))
+    window.dispatchEvent(new Event('cartUpdated'))
+    alert('تم إضافة المنتج للسلة ✅')
   }
 
-  if (loading ||!shop) {
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#121212]">
-        <div className="w-20 h-20 border-4 border-[#D4AF37]/30 border-t-[#D4AF37] rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-[#121212] flex items-center justify-center">
+        <div className="text-[#D4AF37] text-xl">جاري التحميل...</div>
+      </div>
+    )
+  }
+
+  if (error ||!shop) {
+    return (
+      <div className="min-h-screen bg-[#121212] flex items-center justify-center text-white" dir="rtl">
+        <div className="text-center">
+          <Package size={60} className="text-[#D4AF37]/40 mx-auto mb-4" />
+          <h1 className="text-3xl mb-4">المحل غير موجود</h1>
+          <p className="text-white/60 mb-6">{error}</p>
+          <Link to="/" className="inline-flex items-center gap-2 text-[#D4AF37] hover:underline">
+            <ArrowRight size={20} />
+            العودة للرئيسية
+          </Link>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#121212] text-white" dir="rtl">
-      {/* غلاف المحل */}
-      <div className="relative h-64 md:h-80 bg-gradient-to-b from-[#D4AF37]/20 to-[#121212]">
-        {shop.image_url && (
-          <img
-            src={shop.image_url}
-            alt={shop.name}
-            className="w-full h-full object-cover opacity-40"
-          />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-transparent to-transparent"></div>
+    <div className="min-h-screen bg-[#121212] text-white pb-20" dir="rtl">
+      <div className="bg-[#1E1E1E] border-b border-[#333] sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <Link to="/" className="inline-flex items-center gap-2 text-white/60 hover:text-[#D4AF37] transition">
+            <ArrowRight size={20} />
+            العودة للمحلات
+          </Link>
+        </div>
+      </div>
 
-        <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex items-end gap-4">
-              {shop.image_url && (
-                <img
-                  src={shop.image_url}
-                  alt={shop.name}
-                  className="w-24 h-24 md:w-32 md:h-32 rounded-2xl border-4 border-[#D4AF37] object-cover shadow-2xl"
-                />
-              )}
-              <div className="flex-1 pb-2">
-                <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">{shop.name}</h1>
-                {shop.category && (
-                  <span className="inline-block bg-[#D4AF37]/20 text-[#D4AF37] px-4 py-1 rounded-lg text-sm font-bold">
-                    {shop.category}
-                  </span>
-                )}
-              </div>
+      <div className="relative h-64 bg-gradient-to-b from-[#D4AF37]/20 to-[#121212]">
+        {shop.cover_image_url && (
+          <img src={shop.cover_image_url} className="w-full h-full object-cover opacity-30" alt="" />
+        )}
+        <div className="absolute inset-0 flex items-end p-6">
+          <div className="max-w-7xl mx-auto w-full flex items-end gap-6">
+            <img
+              src={shop.logo_url || 'https://placehold.co/120/1E1E1E/D4AF37?text=محل'}
+              className="w-32 h-32 rounded-2xl border-4 border-[#121212] object-cover"
+              alt={shop.name}
+            />
+            <div className="flex-1 pb-4">
+              <h1 className="text-4xl font-bold text-white mb-2">{shop.name}</h1>
+              <p className="text-white/60">{shop.categories?.name}</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-8 py-8">
-
-        {/* معلومات المحل */}
+      <div className="max-w-7xl mx-auto px-4 -mt-8 relative z-10">
         <div className="bg-[#1E1E1E] border border-[#333] rounded-2xl p-6 mb-8">
-          <div className="grid md:grid-cols-3 gap-6">
-            {shop.description && (
-              <div className="md:col-span-3">
-                <p className="text-gray-300 leading-relaxed">{shop.description}</p>
-              </div>
-            )}
-
+          <p className="text-white/70 mb-4">{shop.description || 'لا يوجد وصف'}</p>
+          <div className="flex flex-wrap gap-6 text-sm text-white/60">
             {shop.address && (
-              <div className="flex items-start gap-3">
-                <MapPin size={20} className="text-[#D4AF37] mt-1 flex-shrink-0" />
-                <div>
-                  <p className="text-sm text-gray-400 mb-1">العنوان</p>
-                  <p className="font-medium">{shop.address}</p>
-                </div>
+              <div className="flex items-center gap-2">
+                <MapPin size={16} className="text-[#D4AF37]" />
+                <span>{shop.address}</span>
               </div>
             )}
-
             {shop.phone && (
-              <div className="flex items-start gap-3">
-                <Phone size={20} className="text-[#D4AF37] mt-1 flex-shrink-0" />
-                <div>
-                  <p className="text-sm text-gray-400 mb-1">التليفون</p>
-                  <a href={`tel:${shop.phone}`} className="font-medium hover:text-[#D4AF37] transition">
-                    {shop.phone}
-                  </a>
-                </div>
+              <div className="flex items-center gap-2">
+                <Phone size={16} className="text-[#D4AF37]" />
+                <span dir="ltr">{shop.phone}</span>
               </div>
             )}
-
-            <div className="flex items-start gap-3">
-              <Store size={20} className="text-[#D4AF37] mt-1 flex-shrink-0" />
-              <div>
-                <p className="text-sm text-gray-400 mb-1">صاحب المحل</p>
-                <p className="font-medium">{shop.profiles?.full_name || shop.profiles?.username}</p>
-              </div>
-            </div>
           </div>
         </div>
 
-        {/* المنتجات */}
-        <div>
-          <div className="flex items-center gap-3 mb-6">
-            <Package size={28} className="text-[#D4AF37]" />
-            <h2 className="text-2xl font-bold">منتجات المحل ({products.length})</h2>
-          </div>
+        <h2 className="text-3xl font-bold mb-6">
+          المنتجات
+          <span className="text-sm px-3 py-1 rounded-full bg-[#D4AF37]/10 text-[#D4AF37] mr-3">
+            {products.length}
+          </span>
+        </h2>
 
-          {products.length === 0? (
-            <div className="bg-[#1E1E1E] border border-[#333] rounded-2xl p-12 text-center">
-              <Package size={64} className="mx-auto mb-4 text-gray-600" />
-              <p className="text-gray-400 text-lg">لسه مفيش منتجات في المحل ده</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {products.map((product) => (
-                <div
-                  key={product.id}
-                  className={`bg-[#1E1E1E] border border-[#333] rounded-2xl overflow-hidden hover:border-[#D4AF37] transition group ${
-                   !product.image_url? 'scale-90' : ''
-                  }`}
-                >
-                  {product.image_url? (
-                    <div className="relative h-48 overflow-hidden">
-                      <img
-                        src={product.image_url}
-                        alt={product.name}
-                        className="w-full h-full object-cover group-hover:scale-110 transition duration-300"
-                      />
-                      {product.stock === 0 && (
-                        <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
-                          <span className="bg-red-500 text-white px-4 py-2 rounded-lg font-bold">
-                            نفذت الكمية
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="h-32 bg-[#121212] flex items-center justify-center">
-                      <ImageIcon size={32} className="text-gray-700" />
+        {products.length === 0? (
+          <div className="text-center py-20 bg-[#1E1E1E] rounded-2xl border border-[#333]">
+            <Package className="text-[#D4AF37]/40 mx-auto mb-4" size={60} />
+            <p className="text-white/60 text-xl">لا يوجد منتجات حالياً</p>
+            <p className="text-white/40 text-sm mt-2">صاحب المحل لم يضف منتجات بعد</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {products.map((product) => (
+              <div
+                key={product.id}
+                className={`bg-[#1E1E1E] border border-[#333] rounded-3xl overflow-hidden hover:border-[#D4AF37]/30 transition-all hover:scale-[1.02] ${
+             !product.image_url? 'opacity-80' : ''
+                }`}
+              >
+                <div className="relative h-48 overflow-hidden bg-[#121212]">
+                  <img
+                    src={product.image_url || 'https://placehold.co/400x200/1E1E1E/D4AF37?text=منتج'}
+                    alt={product.name}
+                    className="w-full h-full object-cover"
+                  />
+                  {product.stock === 0 && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                      <span className="bg-red-600 text-white px-4 py-2 rounded-lg font-bold">
+                        نفذت الكمية
+                      </span>
                     </div>
                   )}
-
-                  <div className="p-4">
-                    <h3 className="font-bold mb-1 line-clamp-1">{product.name}</h3>
-
-                    {product.description && product.image_url && (
-                      <p className="text-xs text-gray-400 mb-2 line-clamp-2">{product.description}</p>
-                    )}
-
-                    {product.category && (
-                      <span className="inline-block bg-[#333] text-gray-400 px-2 py-0.5 rounded text-xs mb-2">
-                        {product.category}
-                      </span>
-                    )}
-
-                    <div className="flex items-center justify-between mt-3">
-                      <div className="flex items-center gap-1 text-[#D4AF37] font-bold">
-                        <DollarSign size={16} />
-                        <span>{product.price}</span>
-                      </div>
-
-                      <button
-                        disabled={product.stock === 0}
-                        onClick={() => addToCart(product)}
-                        className="bg-[#D4AF37] text-black p-2 rounded-lg hover:bg-[#D4AF37]/90 transition disabled:opacity-30 disabled:cursor-not-allowed"
-                      >
-                        <ShoppingCart size={16} />
-                      </button>
-                    </div>
-
-                    {product.stock > 0 && product.stock < 10 && (
-                      <p className="text-xs text-orange-500 mt-2">متبقي {product.stock} فقط</p>
-                    )}
-                  </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+
+                <div className="p-5">
+                  <h3 className="text-lg font-bold text-white mb-2 line-clamp-1">
+                    {product.name}
+                  </h3>
+                  <p className="text-white/50 text-sm mb-4 line-clamp-2 h-10">
+                    {product.description || 'لا يوجد وصف'}
+                  </p>
+
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-1 text-[#D4AF37] font-bold text-2xl">
+                      <span>{product.price}</span>
+                      <span className="text-sm">ج.م</span>
+                    </div>
+                    <div className="text-white/40 text-sm">
+                      {product.stock} متاح
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => addToCart(product)}
+                    disabled={product.stock === 0}
+                    className="w-full px-4 py-3 rounded-xl bg-[#D4AF37] text-black font-bold hover:bg-[#D4AF37]/90 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ShoppingCart size={18} />
+                    أضف للسلة
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

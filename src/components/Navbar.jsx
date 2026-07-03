@@ -1,30 +1,41 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { ShoppingCart, Menu, X, Store } from 'lucide-react'
+import { ShoppingCart, Menu, X, Store, Search } from 'lucide-react'
 
 function Navbar() {
   const [categories, setCategories] = useState([])
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [cartCount, setCartCount] = useState(0)
+  const [searchTerm, setSearchTerm] = useState('')
   const navigate = useNavigate()
 
   useEffect(() => {
     loadCategories()
     loadCartCount()
-    
+
     // تحديث عدد السلة كل ما تتغير
     window.addEventListener('cartUpdated', loadCartCount)
-    return () => window.removeEventListener('cartUpdated', loadCartCount)
+    window.addEventListener('storage', loadCartCount)
+
+    return () => {
+      window.removeEventListener('cartUpdated', loadCartCount)
+      window.removeEventListener('storage', loadCartCount)
+    }
   }, [])
 
   async function loadCategories() {
-    const { data } = await supabase
-      .from('categories')
-      .select('*')
-      .order('display_order')
-    
-    if (data) setCategories(data)
+    const { data, error } = await supabase
+     .from('categories')
+     .select('*')
+     .order('display_order')
+
+    if (!error && data) {
+      console.log('Navbar Categories:', data)
+      setCategories(data)
+    } else {
+      console.error('Error loading categories:', error)
+    }
   }
 
   function loadCartCount() {
@@ -33,20 +44,41 @@ function Navbar() {
     setCartCount(count)
   }
 
+  function handleSearch(e) {
+    if (e.key === 'Enter' && searchTerm.trim()) {
+      navigate(`/?search=${encodeURIComponent(searchTerm.trim())}`)
+      setSearchTerm('')
+      setIsMenuOpen(false)
+    }
+  }
+
   return (
     <nav className="bg-[#1E1E1E] border-b border-[#333] sticky top-0 z-40" dir="rtl">
       <div className="max-w-7xl mx-auto px-4">
-        
-        {/* الصف الأول - اللوجو والسلة */}
-        <div className="flex items-center justify-between h-16">
-          <Link to="/" className="flex items-center gap-2">
+
+        {/* الصف الأول - اللوجو والبحث والسلة */}
+        <div className="flex items-center justify-between h-16 gap-4">
+          <Link to="/" className="flex items-center gap-2 flex-shrink-0">
             <Store className="text-[#D4AF37]" size={28} />
-            <span className="text-2xl font-bold text-[#D4AF37]">حلوان ماركت</span>
+            <span className="text-xl md:text-2xl font-bold text-[#D4AF37]">حلوان ماركت</span>
           </Link>
 
-          <div className="flex items-center gap-4">
-            <Link 
-              to="/cart" 
+          {/* البحث - ديسكتوب */}
+          <div className="hidden md:flex flex-1 max-w-md relative">
+            <input
+              type="text"
+              placeholder="ابحث عن منتج..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={handleSearch}
+              className="w-full bg-[#121212] border border-[#333] rounded-xl py-2 px-4 pr-10 text-sm text-white focus:outline-none focus:border-[#D4AF37] placeholder:text-gray-500"
+            />
+            <Search className="absolute right-3 top-2.5 text-gray-500" size={18} />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Link
+              to="/cart"
               className="relative bg-[#121212] p-3 rounded-lg hover:bg-[#2a2a2a] transition"
             >
               <ShoppingCart className="text-[#D4AF37]" size={24} />
@@ -61,13 +93,28 @@ function Navbar() {
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="md:hidden bg-[#121212] p-3 rounded-lg"
             >
-              {isMenuOpen ? <X className="text-white" size={24} /> : <Menu className="text-white" size={24} />}
+              {isMenuOpen? <X className="text-white" size={24} /> : <Menu className="text-white" size={24} />}
             </button>
           </div>
         </div>
 
+        {/* البحث - موبايل */}
+        <div className="md:hidden pb-3">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="ابحث عن منتج..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={handleSearch}
+              className="w-full bg-[#121212] border border-[#333] rounded-xl py-2 px-4 pr-10 text-sm text-white focus:outline-none focus:border-[#D4AF37] placeholder:text-gray-500"
+            />
+            <Search className="absolute right-3 top-2.5 text-gray-500" size={18} />
+          </div>
+        </div>
+
         {/* الصف الثاني - الأقسام ديسكتوب */}
-        <div className="hidden md:flex items-center gap-2 pb-3 overflow-x-auto">
+        <div className="hidden md:flex items-center gap-2 pb-3 overflow-x-auto scrollbar-hide">
           <Link
             to="/"
             className="px-4 py-2 rounded-lg text-white hover:bg-[#2a2a2a] transition whitespace-nowrap font-bold"
@@ -77,10 +124,11 @@ function Navbar() {
           {categories.map(category => (
             <Link
               key={category.id}
-              to={`/category/${category.slug}`}
-              className="px-4 py-2 rounded-lg text-gray-400 hover:text-[#D4AF37] hover:bg-[#2a2a2a] transition whitespace-nowrap"
+              to={`/?category=${category.slug}`}
+              className="px-4 py-2 rounded-lg text-gray-400 hover:text-[#D4AF37] hover:bg-[#2a2a2a] transition whitespace-nowrap flex items-center gap-2"
             >
-              {category.name}
+              <span>{category.icon}</span>
+              <span>{category.name}</span>
             </Link>
           ))}
         </div>
@@ -95,16 +143,22 @@ function Navbar() {
             >
               الرئيسية
             </Link>
-            {categories.map(category => (
-              <Link
-                key={category.id}
-                to={`/category/${category.slug}`}
-                onClick={() => setIsMenuOpen(false)}
-                className="block px-4 py-3 rounded-lg text-gray-400 hover:text-[#D4AF37] hover:bg-[#2a2a2a] transition mb-1"
-              >
-                {category.name}
-              </Link>
-            ))}
+            <div className="border-t border-[#333] my-2"></div>
+            {categories.length === 0? (
+              <div className="px-4 py-3 text-gray-500 text-sm">جاري تحميل الأقسام...</div>
+            ) : (
+              categories.map(category => (
+                <Link
+                  key={category.id}
+                  to={`/?category=${category.slug}`}
+                  onClick={() => setIsMenuOpen(false)}
+                  className="block px-4 py-3 rounded-lg text-gray-400 hover:text-[#D4AF37] hover:bg-[#2a2a2a] transition mb-1 flex items-center gap-2"
+                >
+                  <span>{category.icon}</span>
+                  <span>{category.name}</span>
+                </Link>
+              ))
+            )}
           </div>
         )}
 
