@@ -157,7 +157,7 @@ function Navbar({ session, userRole, adminName, shopName, companyName, handleLog
             <div className="flex items-center gap-2">
               <div className="text-[#D4AF37] text-2xl font-bold">▼</div>
               <div>
-                <h1 className="text-xl font-bold text-[#D4AF37]">مول فاقوس</h1>
+                <h1 className="text-xl font-bold text-[#D4AF37]">سوق فاقوس</h1>
                 <p className="text-xs text-gray-400">تجربة تسوق متكاملة</p>
               </div>
             </div>

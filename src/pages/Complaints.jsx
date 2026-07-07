@@ -12,12 +12,12 @@ export default function Complaints() {
               <span className="text-3xl font-bold text-black">ي</span>
             </div>
             <h2 className="text-2xl font-bold text-[#D4AF37]">المهندس يحيى أيمن</h2>
-            <p className="text-gray-400 mt-2">مطور ومؤسس مول فاقوس</p>
+            <p className="text-gray-400 mt-2">مطور ومؤسس سوق فاقوس</p>
           </div>
 
           <div className="border-t border-[#333] pt-6 space-y-4">
             <p className="text-gray-300 leading-relaxed">
-              مول فاقوس هو منصة تسوق إلكترونية متكاملة تهدف لخدمة أهالي فاقوس والمناطق المجاورة. 
+              سوق فاقوس هو منصة تسوق إلكترونية متكاملة تهدف لخدمة أهالي فاقوس والمناطق المجاورة. 
               نوفر أفضل المحلات والمنتجات بأعلى جودة وأفضل الأسعار.
             </p>
 
