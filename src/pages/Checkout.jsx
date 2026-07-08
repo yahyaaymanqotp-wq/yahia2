@@ -24,8 +24,8 @@ export default function Checkout() {
   async function loadShops() {
     try {
       const { data, error } = await supabase
-   .from("shops")
-   .select("id, name, delivery_fee, min_order");
+  .from("shops")
+  .select("id, name, delivery_fee, min_order");
       if (error) return;
       const map = {};
       data?.forEach(shop => {
@@ -44,7 +44,7 @@ export default function Checkout() {
 
   function handleChange(e) {
     setForm({
- ...form,
+...form,
       [e.target.name]: e.target.value,
     });
   }
@@ -103,23 +103,49 @@ export default function Checkout() {
     }
     setSubmitting(true);
     try {
-      // 🔔 نمسك ID بتاع العميل عشان نعرف نبعتله بعد كده من التوصيل
+      // 🔔 نمسك ID بتاع العميل - النسخة المصححة
       let onesignalId = null;
       try {
         window.OneSignalDeferred = window.OneSignalDeferred || [];
         await new Promise((resolve) => {
           OneSignalDeferred.push(async function (OneSignal) {
             try {
+              console.log('Checking permission...');
+              const permission = await OneSignal.Notifications.permission;
+
+              if (!permission) {
+                console.log('Requesting permission...');
+                await OneSignal.Notifications.requestPermission();
+              }
+
+              // اهم سطر: نجبره يعمل Subscribe
+              console.log('Opting in...');
+              await OneSignal.User.PushSubscription.optIn();
+
+              // نستنى 3 ثواني عشان الـ ID يجهز
+              await new Promise(r => setTimeout(r, 3000));
+
               onesignalId = OneSignal.User.PushSubscription.id;
-            } catch (e) {}
+              console.log('OneSignal ID:', onesignalId);
+            } catch (e) {
+              console.log('OneSignal Error:', e);
+            }
             resolve();
           });
         });
-      } catch (e) {}
+      } catch (e) {
+        console.log('OneSignal Init Error:', e);
+      }
+
+      if (!onesignalId) {
+        alert("لازم تفعل الاشعارات عشان تتابع طلبك. اتأكد انك فاتح https ومش وضع تصفح خفي");
+        setSubmitting(false);
+        return;
+      }
 
       const { data: mainOrder, error: mainError } = await supabase
-   .from("orders")
-   .insert({
+  .from("orders")
+  .insert({
           shop_id: null,
           customer_name: form.name.trim(),
           customer_phone: form.phone.trim(),
@@ -132,8 +158,8 @@ export default function Checkout() {
           payment_status: "pending",
           onesignal_id: onesignalId
         })
-   .select()
-   .single();
+  .select()
+  .single();
       if (mainError) throw mainError;
 
       const mainOrderItems = cart.map(item => ({
@@ -153,8 +179,8 @@ export default function Checkout() {
         const shopDeliveryFee = parseFloat(shop.shopData?.delivery_fee || 0)
         const shopTotal = shop.subtotal + shopDeliveryFee
         const { data: orderData, error: orderError } = await supabase
-     .from("orders")
-     .insert({
+    .from("orders")
+    .insert({
             shop_id: shop.shopId,
             parent_order_id: mainOrder.id,
             customer_name: form.name.trim(),
@@ -168,8 +194,8 @@ export default function Checkout() {
             payment_status: "pending",
             onesignal_id: onesignalId
           })
-     .select()
-     .single();
+    .select()
+    .single();
         if (orderError) throw orderError;
         const orderItems = shop.items.map(item => ({
           order_id: orderData.id,
@@ -198,7 +224,7 @@ export default function Checkout() {
       try {
         // 0- للعميل نفسه: تم الاستلام والسعر كذا
         if (onesignalId) {
-          fetch('/api/sendNotification', {
+          await fetch('/api/sendNotification', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -211,7 +237,7 @@ export default function Checkout() {
 
         // 1- لصاحب المحل: عندك طلب كذا بس
         for (const shop of groupedByShop) {
-          fetch('/api/sendNotification', {
+          await fetch('/api/sendNotification', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -223,7 +249,7 @@ export default function Checkout() {
         }
 
         // 2- للتوصيل: طلب جديد بكل البيانات
-        fetch('/api/sendNotification', {
+        await fetch('/api/sendNotification', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -234,7 +260,7 @@ export default function Checkout() {
         });
 
         // 3- للادمن: كل حاجة
-        fetch('/api/sendNotification', {
+        await fetch('/api/sendNotification', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
