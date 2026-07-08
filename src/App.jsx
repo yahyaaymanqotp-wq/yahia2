@@ -1,3 +1,4 @@
+
 import Cart from './pages/Cart.jsx'
 import Checkout from './pages/Checkout.jsx'
 import { BrowserRouter, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
@@ -31,7 +32,13 @@ function AppContent() {
   useEffect(() => {
     fetchCategories()
   }, [])
-
+useEffect(() => {
+  if ("Notification" in window) {
+    Notification.requestPermission().then(perm => {
+      console.log("الاذن:", perm);
+    });
+  }
+}, []);
   async function fetchCategories() {
     const { data, error } = await supabase
    .from('categories')

@@ -2,136 +2,149 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { LogIn, Store, Truck, Shield } from 'lucide-react'
 
+function setOneSignalUser(id, role) {
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    try {
+      await OneSignal.login(id.toString());
+      await OneSignal.User.addTags({ role: role, user_id: id.toString() });
+    } catch (e) { console.log(e) }
+  });
+}
+
 export default function Login() {
   const [formData, setFormData] = useState({ username: '', password: '' })
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+    const [loading, setLoading] = useState(false)
+      const [error, setError] = useState('')
 
-  async function handleLogin(e) {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
+        async function handleLogin(e) {
+            e.preventDefault()
+                setLoading(true)
+                    setError('')
 
-    try {
-      const username = formData.username.trim()
-      const password = formData.password
+                        try {
+                              const username = formData.username.trim()
+                                    const password = formData.password
 
-      // 1. جرب الأدمن
-      const { data: admin } = await supabase
-    .from('admins')
-    .select('*')
-    .eq('username', username)
-    .eq('password', password)
-    .eq('is_active', true)
-    .single()
+                                          // 1. جرب الأدمن
+                                                const { data: admin } = await supabase
+                                                    .from('admins')
+                                                        .select('*')
+                                                            .eq('username', username)
+                                                                .eq('password', password)
+                                                                    .eq('is_active', true)
+                                                                        .single()
 
-      if (admin) {
-        localStorage.setItem('user_role', 'admin')
-        localStorage.setItem('admin_id', admin.id)
-        window.location.href = '/admin'
-        return
-      }
+                                                                              if (admin) {
+                                                                                      localStorage.setItem('user_role', 'admin')
+                                                                                              localStorage.setItem('admin_id', admin.id)
+                                                                                                      setOneSignalUser(admin.id, 'admin')
+                                                                                                      window.location.href = '/admin'
+                                                                                                              return
+                                                                                                                    }
 
-      // 2. جرب المحلات
-      const { data: shop } = await supabase
-    .from('shops')
-    .select('*')
-    .eq('username', username)
-    .eq('password', password)
-    .eq('is_active', true)
-    .single()
+                                                                                                                          // 2. جرب المحلات
+                                                                                                                                const { data: shop } = await supabase
+                                                                                                                                    .from('shops')
+                                                                                                                                        .select('*')
+                                                                                                                                            .eq('username', username)
+                                                                                                                                                .eq('password', password)
+                                                                                                                                                    .eq('is_active', true)
+                                                                                                                                                        .single()
 
-      if (shop) {
-        localStorage.setItem('user_role', 'shop')
-        localStorage.setItem('shop_id', shop.id)
-        localStorage.setItem('shop_name', shop.name)
-        window.location.href = '/shop-dashboard'
-        return
-      }
+                                                                                                                                                              if (shop) {
+                                                                                                                                                                      localStorage.setItem('user_role', 'shop')
+                                                                                                                                                                              localStorage.setItem('shop_id', shop.id)
+                                                                                                                                                                                      localStorage.setItem('shop_name', shop.name)
+                                                                                                                                                                                              setOneSignalUser(shop.id, 'shop_owner')
+                                                                                                                                                                                              window.location.href = '/shop-dashboard'
+                                                                                                                                                                                                      return
+                                                                                                                                                                                                            }
 
-      // 3. جرب شركات التوصيل - ده اللي كان ناقص
-      const { data: company, error: companyError } = await supabase
-    .from('delivery_companies')
-    .select('*')
-    .eq('username', username)
-    .eq('password', password)
-    .eq('is_active', true)
-    .single()
+                                                                                                                                                                                                                  // 3. جرب شركات التوصيل - ده اللي كان ناقص
+                                                                                                                                                                                                                        const { data: company, error: companyError } = await supabase
+                                                                                                                                                                                                                            .from('delivery_companies')
+                                                                                                                                                                                                                                .select('*')
+                                                                                                                                                                                                                                    .eq('username', username)
+                                                                                                                                                                                                                                        .eq('password', password)
+                                                                                                                                                                                                                                            .eq('is_active', true)
+                                                                                                                                                                                                                                                .single()
 
-      console.log('Delivery company check:', { company, companyError })
+                                                                                                                                                                                                                                                      console.log('Delivery company check:', { company, companyError })
 
-      if (company) {
-        localStorage.setItem('user_role', 'delivery')
-        localStorage.setItem('delivery_company_id', company.id)
-        localStorage.setItem('company_name', company.name)
-        window.location.href = '/delivery-dashboard'
-        return
-      }
+                                                                                                                                                                                                                                                            if (company) {
+                                                                                                                                                                                                                                                                    localStorage.setItem('user_role', 'delivery')
+                                                                                                                                                                                                                                                                            localStorage.setItem('delivery_company_id', company.id)
+                                                                                                                                                                                                                                                                                    localStorage.setItem('company_name', company.name)
+                                                                                                                                                                                                                                                                                            setOneSignalUser(company.id, 'delivery')
+                                                                                                                                                                                                                                                                                            window.location.href = '/delivery-dashboard'
+                                                                                                                                                                                                                                                                                                    return
+                                                                                                                                                                                                                                                                                                          }
 
-      setError('اسم المستخدم أو كلمة المرور غير صحيحة')
-    } catch (err) {
-      console.error('Login error:', err)
-      setError('حدث خطأ في تسجيل الدخول')
-    } finally {
-      setLoading(false)
-    }
-  }
+                                                                                                                                                                                                                                                                                                                setError('اسم المستخدم أو كلمة المرور غير صحيحة')
+                                                                                                                                                                                                                                                                                                                    } catch (err) {
+                                                                                                                                                                                                                                                                                                                          console.error('Login error:', err)
+                                                                                                                                                                                                                                                                                                                                setError('حدث خطأ في تسجيل الدخول')
+                                                                                                                                                                                                                                                                                                                                    } finally {
+                                                                                                                                                                                                                                                                                                                                          setLoading(false)
+                                                                                                                                                                                                                                                                                                                                              }
+                                                                                                                                                                                                                                                                                                                                                }
 
-  return (
-    <div className="min-h-screen bg-[#121212] flex items-center justify-center p-4" dir="rtl">
-      <div className="w-full max-w-md bg-[#1E1E1E] border border-[#333] rounded-2xl p-6 md:p-8">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-[#D4AF37]/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <LogIn className="text-[#D4AF37]" size={32} />
-          </div>
-          <h1 className="text-2xl md:text-3xl font-bold text-[#D4AF37] mb-2">تسجيل الدخول</h1>
-          <p className="text-gray-400 text-sm">ادخل بياناتك للوصول للوحة التحكم</p>
-        </div>
+                                                                                                                                                                                                                                                                                                                                                  return (
+                                                                                                                                                                                                                                                                                                                                                      <div className="min-h-screen bg-[#121212] flex items-center justify-center p-4" dir="rtl">
+                                                                                                                                                                                                                                                                                                                                                            <div className="w-full max-w-md bg-[#1E1E1E] border border-[#333] rounded-2xl p-6 md:p-8">
+                                                                                                                                                                                                                                                                                                                                                                    <div className="text-center mb-8">
+                                                                                                                                                                                                                                                                                                                                                                              <div className="w-16 h-16 bg-[#D4AF37]/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                                                                                                                                                                                                                                                                                                                                                          <LogIn className="text-[#D4AF37]" size={32} />
+                                                                                                                                                                                                                                                                                                                                                                                                    </div>
+                                                                                                                                                                                                                                                                                                                                                                                                              <h1 className="text-2xl md:text-3xl font-bold text-[#D4AF37] mb-2">تسجيل الدخول</h1>
+                                                                                                                                                                                                                                                                                                                                                                                                                        <p className="text-gray-400 text-sm">ادخل بياناتك للوصول للوحة التحكم</p>
+                                                                                                                                                                                                                                                                                                                                                                                                                                </div>
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-400 mb-2">اسم المستخدم</label>
-            <input
-              type="text"
-              value={formData.username}
-              onChange={(e) => setFormData({...formData, username: e.target.value})}
-              className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3 text-white focus:border-[#D4AF37] focus:outline-none"
-              placeholder="ادخل اسم المستخدم"
-              required
-            />
-          </div>
+                                                                                                                                                                                                                                                                                                                                                                                                                                        <form onSubmit={handleLogin} className="space-y-4">
+                                                                                                                                                                                                                                                                                                                                                                                                                                                  <div>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                              <label className="block text-sm text-gray-400 mb-2">اسم المستخدم</label>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                          <input
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        type="text"
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      value={formData.username}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    onChange={(e) => setFormData({...formData, username: e.target.value})}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3 text-white focus:border-[#D4AF37] focus:outline-none"
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                placeholder="ادخل اسم المستخدم"
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              required
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          />
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    </div>
 
-          <div>
-            <label className="block text-sm text-gray-400 mb-2">كلمة المرور</label>
-            <input
-              type="password"
-              value={formData.password}
-              onChange={(e) => setFormData({...formData, password: e.target.value})}
-              className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3 text-white focus:border-[#D4AF37] focus:outline-none"
-              placeholder="ادخل كلمة المرور"
-              required
-            />
-          </div>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              <div>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          <label className="block text-sm text-gray-400 mb-2">كلمة المرور</label>
+                                                                                                                                                                                                                                                                                                                                                      <input
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    type="password"
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  value={formData.password}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                onChange={(e) => setFormData({...formData, password: e.target.value})}
+                                                                                                                                                                                                                                                                                                                                                                                                              className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3 text-white focus:border-[#D4AF37] focus:outline-none"
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            placeholder="ادخل كلمة المرور"
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          required
+                                                                                                                                                                                                                                                                                                                                                                                                                                                      />
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                </div>
 
-          {error && (
-            <div className="bg-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm">
-              {error}
-            </div>
-          )}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                          {error && (
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      <div className="bg-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm">
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    {error}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                </div>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-[#D4AF37] text-black py-3 rounded-xl font-bold hover:bg-[#D4AF37]/90 transition disabled:opacity-50"
-          >
-            {loading? 'جاري الدخول...' : 'تسجيل الدخول'}
-          </button>
-        </form>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    <button
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                type="submit"
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            disabled={loading}
+                                                                                                                                                                                                                                                                                                        className="w-full bg-[#D4AF37] text-black py-3 rounded-xl font-bold hover:bg-[#D4AF37]/90 transition disabled:opacity-50"
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  >
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {loading? 'جاري الدخول...' : 'تسجيل الدخول'}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        </button>
+                                                                                                                                                                                                                                                                                                                                                </form>
 
-        <div className="mt-6 pt-6 border-t border-[#333]">
-          <p className="text-center text-gray-500 text-xs">سوق فاقوس © 2026</p>
-        </div>
-      </div>
-    </div>
-  )
-}
+                                                                                                                                                                                                                                                                                                                                                        <div className="mt-6 pt-6 border-t border-[#333]">
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  <p className="text-center text-gray-500 text-xs">سوق فاقوس © 2026</p>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          </div>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                </div>
+                                                                                                                                                                                                                                                                                                                                                                                    </div>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      )
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      }

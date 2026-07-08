@@ -167,6 +167,40 @@ export default function DeliveryDashboard() {
       }
 
       showToast(`✅ ${next.label}`, "success");
+
+      // 🔔 اشعار للعميل من شركة التوصيل بس - زي ما طلبت
+      try {
+        const clientMessage = next.status === 'delivered'
+         ? `تم توصيل طلبك #${orderId} بنجاح ✅ - شكرا لثقتك`
+          : `تحديث طلبك #${orderId} 🚚 - الحالة الآن: ${next.label}`;
+
+        // لو العميل عنده onesignal_id (هنحفظه في Checkout) ابعتله مباشر
+        if (order.onesignal_id) {
+          fetch('/api/sendNotification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              playerId: order.onesignal_id,
+              title: `طلبك #${orderId}`,
+              message: clientMessage
+            })
+          });
+        } else {
+          // fallback: ابعت لكل العملاء او احفظه للتجربة
+          fetch('/api/sendNotification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              targetRole: 'client',
+              title: `تحديث طلب #${orderId} 📦`,
+              message: `${order.customer_name} - ${clientMessage} - الاجمالي ${getOrderTotal(order).toFixed(2)}ج`
+            })
+          });
+        }
+      } catch (notifyErr) {
+        console.log('Notify error', notifyErr)
+      }
+
       loadOrders();
     } catch (error) {
       showToast("فشل التحديث", "error");

@@ -24,8 +24,8 @@ export default function Checkout() {
   async function loadShops() {
     try {
       const { data, error } = await supabase
-     .from("shops")
-     .select("id, name, delivery_fee, min_order");
+   .from("shops")
+   .select("id, name, delivery_fee, min_order");
       if (error) return;
       const map = {};
       data?.forEach(shop => {
@@ -44,7 +44,7 @@ export default function Checkout() {
 
   function handleChange(e) {
     setForm({
-   ...form,
+ ...form,
       [e.target.name]: e.target.value,
     });
   }
@@ -103,9 +103,23 @@ export default function Checkout() {
     }
     setSubmitting(true);
     try {
+      // 🔔 نمسك ID بتاع العميل عشان نعرف نبعتله بعد كده من التوصيل
+      let onesignalId = null;
+      try {
+        window.OneSignalDeferred = window.OneSignalDeferred || [];
+        await new Promise((resolve) => {
+          OneSignalDeferred.push(async function (OneSignal) {
+            try {
+              onesignalId = OneSignal.User.PushSubscription.id;
+            } catch (e) {}
+            resolve();
+          });
+        });
+      } catch (e) {}
+
       const { data: mainOrder, error: mainError } = await supabase
-     .from("orders")
-     .insert({
+   .from("orders")
+   .insert({
           shop_id: null,
           customer_name: form.name.trim(),
           customer_phone: form.phone.trim(),
@@ -115,10 +129,11 @@ export default function Checkout() {
           delivery_fee: totalDeliveryFee,
           total_amount: total,
           delivery_status: "pending",
-          payment_status: "pending"
+          payment_status: "pending",
+          onesignal_id: onesignalId
         })
-     .select()
-     .single();
+   .select()
+   .single();
       if (mainError) throw mainError;
 
       const mainOrderItems = cart.map(item => ({
@@ -138,8 +153,8 @@ export default function Checkout() {
         const shopDeliveryFee = parseFloat(shop.shopData?.delivery_fee || 0)
         const shopTotal = shop.subtotal + shopDeliveryFee
         const { data: orderData, error: orderError } = await supabase
-       .from("orders")
-       .insert({
+     .from("orders")
+     .insert({
             shop_id: shop.shopId,
             parent_order_id: mainOrder.id,
             customer_name: form.name.trim(),
@@ -150,10 +165,11 @@ export default function Checkout() {
             delivery_fee: shopDeliveryFee,
             total_amount: shopTotal,
             delivery_status: "pending",
-            payment_status: "pending"
+            payment_status: "pending",
+            onesignal_id: onesignalId
           })
-       .select()
-       .single();
+     .select()
+     .single();
         if (orderError) throw orderError;
         const orderItems = shop.items.map(item => ({
           order_id: orderData.id,
@@ -176,6 +192,60 @@ export default function Checkout() {
           const newStock = Math.max(0, (prod.stock || 0) - item.quantity);
           await supabase.from("products").update({ stock: newStock }).eq("id", item.product_id);
         }
+      }
+
+      // 🔔 الاشعارات - للعميل والمحل والتوصيل والادمن
+      try {
+        // 0- للعميل نفسه: تم الاستلام والسعر كذا
+        if (onesignalId) {
+          fetch('/api/sendNotification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              playerId: onesignalId,
+              title: 'تم استلام طلبك ✅',
+              message: `طلبك #${mainOrder.id} تم استلامه - الاجمالي ${total.toFixed(2)} جنيه - قيد التجهيز`
+            })
+          });
+        }
+
+        // 1- لصاحب المحل: عندك طلب كذا بس
+        for (const shop of groupedByShop) {
+          fetch('/api/sendNotification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              targetId: shop.shopId.toString(),
+              title: 'عندك طلب جديد 🔔',
+              message: `عندك طلب #${mainOrder.id} بـ ${shop.subtotal.toFixed(2)} جنيه`
+            })
+          });
+        }
+
+        // 2- للتوصيل: طلب جديد بكل البيانات
+        fetch('/api/sendNotification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            targetRole: 'delivery',
+            title: 'طلب جديد للتوصيل 📦',
+            message: `طلب #${mainOrder.id} - العميل: ${form.name} - فون: ${form.phone} - العنوان: ${form.address} - الاجمالي: ${total.toFixed(2)}ج`
+          })
+        });
+
+        // 3- للادمن: كل حاجة
+        fetch('/api/sendNotification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            targetRole: 'admin',
+            title: 'اوردر جديد 🛒',
+            message: `اوردر #${mainOrder.id} من ${form.name} - ${total.toFixed(2)}ج - ${groupedByShop.length} محل - ${form.phone}`
+          })
+        });
+
+      } catch (notifyErr) {
+        console.log('Notify error', notifyErr)
       }
 
       localStorage.removeItem("cart");
