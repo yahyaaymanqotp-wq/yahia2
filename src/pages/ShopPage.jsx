@@ -20,11 +20,11 @@ export default function ShopPage() {
       setError(null)
 
       const { data: shopData, error: shopError } = await supabase
-   .from('shops')
-   .select('*, categories(name, icon)')
-   .eq('id', id)
-   .eq('is_active', true)
-   .single()
+  .from('shops')
+  .select('*, categories(name, icon)')
+  .eq('id', id)
+  .eq('is_active', true)
+  .single()
 
       if (shopError) throw new Error('المحل غير موجود')
       if (!shopData) throw new Error('المحل غير موجود')
@@ -32,11 +32,11 @@ export default function ShopPage() {
       setShop(shopData)
 
       const { data: productsData, error: productsError } = await supabase
-   .from('products')
-   .select('*')
-   .eq('shop_id', id)
-   .eq('is_active', true)
-   .order('created_at', { ascending: false })
+  .from('products')
+  .select('*')
+  .eq('shop_id', id)
+  .eq('is_active', true)
+  .order('created_at', { ascending: false })
 
       if (productsError) throw productsError
 
@@ -163,57 +163,93 @@ export default function ShopPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {products.map((product) => (
-              <div
-                key={product.id}
-                className={`bg-[#1E1E1E] border border-[#333] rounded-3xl overflow-hidden hover:border-[#D4AF37]/30 transition-all hover:scale-[1.02] ${
-             !product.image_url? 'opacity-80' : ''
-                }`}
-              >
-                <div className="relative h-48 overflow-hidden bg-[#121212]">
-                  <img
-                    src={product.image_url || 'https://placehold.co/400x200/1E1E1E/D4AF37?text=منتج'}
-                    alt={product.name}
-                    className="w-full h-full object-cover"
-                  />
-                  {product.stock === 0 && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                      <span className="bg-red-600 text-white px-4 py-2 rounded-lg font-bold">
-                        نفذت الكمية
-                      </span>
+            {products.map((product) => {
+              const hasImage =!!product.image_url;
+              const hasDiscount = product.discount_percent > 0 || (product.old_price && parseFloat(product.old_price) > parseFloat(product.price));
+              const discountLabel = product.discount_percent? `${product.discount_percent}% خصم` : product.old_price? `خصم ${(parseFloat(product.old_price) - parseFloat(product.price)).toFixed(0)} ج.م` : null;
+
+              return (
+                <div
+                  key={product.id}
+                  className="bg-[#1E1E1E] border border-[#333] rounded-3xl overflow-hidden hover:border-[#D4AF37]/30 transition-all hover:scale-[1.02] flex flex-col"
+                >
+                  {hasImage && (
+                    <div className="relative h-48 overflow-hidden bg-[#121212]">
+                      <img
+                        src={product.image_url}
+                        alt={product.name}
+                        className="w-full h-full object-cover"
+                      />
+                      {hasDiscount && (
+                        <span className="absolute top-3 right-3 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+                          {discountLabel}
+                        </span>
+                      )}
+                      {product.stock === 0 && (
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                          <span className="bg-red-600 text-white px-4 py-2 rounded-lg font-bold">
+                            نفذت الكمية
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
 
-                <div className="p-5">
-                  <h3 className="text-lg font-bold text-white mb-2 line-clamp-1">
-                    {product.name}
-                  </h3>
-                  <p className="text-white/50 text-sm mb-4 line-clamp-2 h-10">
-                    {product.description || 'لا يوجد وصف'}
-                  </p>
+                  <div className="p-5 flex flex-col flex-1">
+                    <h3 className="text-lg font-bold text-white mb-1 line-clamp-1">
+                      {product.name}
+                    </h3>
 
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-1 text-[#D4AF37] font-bold text-2xl">
-                      <span>{product.price}</span>
-                      <span className="text-sm">ج.م</span>
+                    {!hasImage && product.description && (
+                      <p className="text-white/50 text-sm mb-3 line-clamp-2">
+                        {product.description}
+                      </p>
+                    )}
+                    {hasImage && (
+                      <p className="text-white/50 text-sm mb-4 line-clamp-2 h-10">
+                        {product.description || 'لا يوجد وصف'}
+                      </p>
+                    )}
+
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 text-[#D4AF37] font-bold text-2xl">
+                          <span>{product.price}</span>
+                          <span className="text-sm">ج.م</span>
+                        </div>
+                        {product.old_price && parseFloat(product.old_price) > parseFloat(product.price) && (
+                          <span className="text-white/30 line-through text-sm">{product.old_price} ج.م</span>
+                        )}
+                      </div>
+                      <div className="text-white/40 text-sm">
+                        {product.stock} متاح
+                      </div>
                     </div>
-                    <div className="text-white/40 text-sm">
-                      {product.stock} متاح
-                    </div>
+
+                    {!hasImage && hasDiscount && (
+                      <div className="mb-3">
+                        <span className="bg-red-500/20 text-red-400 text-xs font-bold px-3 py-1 rounded-full">
+                          {discountLabel}
+                        </span>
+                      </div>
+                    )}
+
+                    {hasImage && product.stock === 0? null :!hasImage && product.stock === 0? (
+                      <div className="w-full px-4 py-3 rounded-xl bg-red-500/20 text-red-400 font-bold text-center">نفذت الكمية</div>
+                    ) : null}
+
+                    <button
+                      onClick={() => addToCart(product)}
+                      disabled={product.stock === 0}
+                      className="w-full mt-auto px-4 py-3 rounded-xl bg-[#D4AF37] text-black font-bold hover:bg-[#D4AF37]/90 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <ShoppingCart size={18} />
+                      أضف للسلة
+                    </button>
                   </div>
-
-                  <button
-                    onClick={() => addToCart(product)}
-                    disabled={product.stock === 0}
-                    className="w-full px-4 py-3 rounded-xl bg-[#D4AF37] text-black font-bold hover:bg-[#D4AF37]/90 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ShoppingCart size={18} />
-                    أضف للسلة
-                  </button>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

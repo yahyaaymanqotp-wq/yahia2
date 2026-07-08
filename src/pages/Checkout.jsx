@@ -24,8 +24,8 @@ export default function Checkout() {
   async function loadShops() {
     try {
       const { data, error } = await supabase
-      .from("shops")
-      .select("id, name, delivery_fee, min_order");
+     .from("shops")
+     .select("id, name, delivery_fee, min_order");
       if (error) return;
       const map = {};
       data?.forEach(shop => {
@@ -44,7 +44,7 @@ export default function Checkout() {
 
   function handleChange(e) {
     setForm({
-    ...form,
+   ...form,
       [e.target.name]: e.target.value,
     });
   }
@@ -104,8 +104,8 @@ export default function Checkout() {
     setSubmitting(true);
     try {
       const { data: mainOrder, error: mainError } = await supabase
-      .from("orders")
-      .insert({
+     .from("orders")
+     .insert({
           shop_id: null,
           customer_name: form.name.trim(),
           customer_phone: form.phone.trim(),
@@ -117,8 +117,8 @@ export default function Checkout() {
           delivery_status: "pending",
           payment_status: "pending"
         })
-      .select()
-      .single();
+     .select()
+     .single();
       if (mainError) throw mainError;
 
       const mainOrderItems = cart.map(item => ({
@@ -138,8 +138,8 @@ export default function Checkout() {
         const shopDeliveryFee = parseFloat(shop.shopData?.delivery_fee || 0)
         const shopTotal = shop.subtotal + shopDeliveryFee
         const { data: orderData, error: orderError } = await supabase
-        .from("orders")
-        .insert({
+       .from("orders")
+       .insert({
             shop_id: shop.shopId,
             parent_order_id: mainOrder.id,
             customer_name: form.name.trim(),
@@ -152,8 +152,8 @@ export default function Checkout() {
             delivery_status: "pending",
             payment_status: "pending"
           })
-        .select()
-        .single();
+       .select()
+       .single();
         if (orderError) throw orderError;
         const orderItems = shop.items.map(item => ({
           order_id: orderData.id,
@@ -168,6 +168,16 @@ export default function Checkout() {
         const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
         if (itemsError) throw itemsError;
       }
+
+      // ✅ نقص المخزون بعد تأكيد الطلب
+      for (const item of cart) {
+        const { data: prod } = await supabase.from("products").select("stock").eq("id", item.product_id).single();
+        if (prod) {
+          const newStock = Math.max(0, (prod.stock || 0) - item.quantity);
+          await supabase.from("products").update({ stock: newStock }).eq("id", item.product_id);
+        }
+      }
+
       localStorage.removeItem("cart");
       window.dispatchEvent(new Event('cartUpdated'));
       setShowSuccess({ id: mainOrder.id, total: total.toFixed(2), count: totalItems });

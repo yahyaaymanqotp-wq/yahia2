@@ -71,42 +71,47 @@ export default function AdminDashboard() {
       setStats({
         shops: shopsRes.data?.length || 0,
         companies: companiesRes.data?.length || 0,
-        orders: ordersRes.data?.length || 0
+        orders: ordersRes.data?.filter(o => o.shop_id === null).length || 0
       })
 
       const salesByShop = {}
       const earningsByCompany = {}
 
-      ordersRes.data?.forEach(order => {
-        if (order.delivery_status === 'delivered') {
-          if (order.shop_id) {
-            if (!salesByShop[order.shop_id]) {
-              salesByShop[order.shop_id] = { total: 0, count: 0 }
-            }
+      // ✅ التصحيح: الليدجر هو الأساس عشان ميحسبش مرتين
+      // لو فيه ليدجر نستخدمه، لو مفيش نستخدم الطلبات القديمة
+      if (shopLedgerRes.data && shopLedgerRes.data.length > 0) {
+        shopLedgerRes.data.forEach(row => {
+          salesByShop[row.shop_id] = {
+            total: parseFloat(row.total_sales || 0),
+            count: parseInt(row.total_orders || 0)
+          }
+        })
+      } else {
+        ordersRes.data?.forEach(order => {
+          if (order.delivery_status === 'delivered' && order.shop_id) {
+            if (!salesByShop[order.shop_id]) salesByShop[order.shop_id] = { total: 0, count: 0 }
             salesByShop[order.shop_id].total += parseFloat(order.total_amount || 0)
             salesByShop[order.shop_id].count += 1
           }
-          if (order.delivery_company_id) {
-            if (!earningsByCompany[order.delivery_company_id]) {
-              earningsByCompany[order.delivery_company_id] = { total: 0, count: 0 }
-            }
+        })
+      }
+
+      if (deliveryLedgerRes.data && deliveryLedgerRes.data.length > 0) {
+        deliveryLedgerRes.data.forEach(row => {
+          earningsByCompany[row.company_id] = {
+            total: parseFloat(row.total_earnings || 0),
+            count: parseInt(row.total_orders || 0)
+          }
+        })
+      } else {
+        ordersRes.data?.forEach(order => {
+          if (order.delivery_status === 'delivered' && order.delivery_company_id) {
+            if (!earningsByCompany[order.delivery_company_id]) earningsByCompany[order.delivery_company_id] = { total: 0, count: 0 }
             earningsByCompany[order.delivery_company_id].total += parseFloat(order.delivery_fee || 0)
             earningsByCompany[order.delivery_company_id].count += 1
           }
-        }
-      })
-
-      // الارباح المحفوظة حتى لو الطلب اتحذف هتفضل
-      shopLedgerRes.data?.forEach(row => {
-        if (!salesByShop[row.shop_id]) salesByShop[row.shop_id] = { total: 0, count: 0 }
-        salesByShop[row.shop_id].total += parseFloat(row.total_sales || 0)
-        salesByShop[row.shop_id].count += parseInt(row.total_orders || 0)
-      })
-      deliveryLedgerRes.data?.forEach(row => {
-        if (!earningsByCompany[row.company_id]) earningsByCompany[row.company_id] = { total: 0, count: 0 }
-        earningsByCompany[row.company_id].total += parseFloat(row.total_earnings || 0)
-        earningsByCompany[row.company_id].count += parseInt(row.total_orders || 0)
-      })
+        })
+      }
 
       setShopSales(salesByShop)
       setCompanyEarnings(earningsByCompany)
@@ -142,12 +147,12 @@ export default function AdminDashboard() {
     e.preventDefault()
     try {
       const { data, error } = await supabase
-  .from('admins')
-  .select('*')
-  .eq('username', loginForm.username)
-  .eq('password', loginForm.password)
-  .eq('is_active', true)
-  .single()
+.from('admins')
+.select('*')
+.eq('username', loginForm.username)
+.eq('password', loginForm.password)
+.eq('is_active', true)
+.single()
 
       if (error ||!data) {
         alert('بيانات الدخول غير صحيحة')
@@ -184,14 +189,14 @@ export default function AdminDashboard() {
       const filePath = `shops/${fileName}`
 
       const { error: uploadError } = await supabase.storage
-  .from('shop-images')
-  .upload(filePath, file)
+.from('shop-images')
+.upload(filePath, file)
 
       if (uploadError) throw uploadError
 
       const { data: { publicUrl } } = supabase.storage
-  .from('shop-images')
-  .getPublicUrl(filePath)
+.from('shop-images')
+.getPublicUrl(filePath)
 
       setShopForm(prev => ({...prev, logo_url: publicUrl }))
     } catch (error) {
@@ -475,7 +480,7 @@ export default function AdminDashboard() {
                       onClick={() => toggleShopStatus(shop.id, shop.is_active)}
                       className={`px-2 md:px-3 py-1 rounded-lg text-xs md:text-sm font-bold flex-shrink-0 ${
                         shop.is_active
-                ? 'bg-green-500/20 text-green-400'
+              ? 'bg-green-500/20 text-green-400'
                         : 'bg-red-500/20 text-red-400'
                       }`}
                     >
@@ -528,7 +533,7 @@ export default function AdminDashboard() {
                         onClick={() => toggleCompanyStatus(company.id, company.is_active)}
                         className={`px-3 py-1 rounded-lg text-xs font-bold ${
                           company.is_active
-                    ? 'bg-green-500/20 text-green-400'
+                  ? 'bg-green-500/20 text-green-400'
                             : 'bg-red-500/20 text-red-400'
                         }`}
                       >

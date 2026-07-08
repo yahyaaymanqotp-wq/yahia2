@@ -39,13 +39,13 @@ export default function ShopDashboard() {
         schema: 'public', 
         table: 'orders',
         filter: `shop_id=eq.${shopId}`
-      }, loadOrders)
+      }, () => loadOrders())
    .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
         table: 'products',
         filter: `shop_id=eq.${shopId}`
-      }, loadProducts)
+      }, () => loadProducts())
    .subscribe()
 
     return () => channel.unsubscribe()
@@ -105,7 +105,10 @@ export default function ShopDashboard() {
     pendingOrders: orders.filter(o => o.delivery_status === 'pending').length,
     totalSales: orders
    .filter(o => o.delivery_status === 'delivered')
-   .reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0)
+   .reduce((sum, o) => {
+     const total = parseFloat(o.total_amount) || (o.order_items || []).reduce((s, i) => s + parseFloat(i.subtotal || i.price || 0), 0)
+     return sum + total
+   }, 0)
   }
 
   async function uploadFile(file) {
@@ -149,7 +152,6 @@ export default function ShopDashboard() {
       return
     }
 
-    // شيل category لو العمود مش موجود في الداتابيز
     const productData = {
       shop_id: shopId,
       name: formData.name.trim(),
@@ -164,8 +166,6 @@ export default function ShopDashboard() {
       is_active: true
     }
 
-    console.log('Saving product:', productData)
-
     try {
       if (editingProduct) {
         const { error } = await supabase
@@ -179,8 +179,6 @@ export default function ShopDashboard() {
        .from('products')
        .insert(productData)
        .select()
-        
-        console.log('Insert response:', { data, error })
         if (error) throw error
         alert('✅ تم إضافة المنتج')
       }
@@ -256,7 +254,6 @@ export default function ShopDashboard() {
   return (
     <div className="min-h-screen bg-[#121212] text-white p-4 md:p-8" dir="rtl">
       <div className="max-w-7xl mx-auto">
-
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-[#D4AF37] mb-2">لوحة المحل</h1>

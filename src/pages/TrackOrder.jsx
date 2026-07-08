@@ -111,7 +111,7 @@ export default function TrackOrder() {
 
   const calculatedSubtotal = groupedByShop.reduce((s, shop) => s + shop.subtotal, 0);
   const deliveryFee = parseFloat(order?.delivery_fee || 0);
-  const finalTotal = parseFloat(order?.total_amount || 0) > 0? parseFloat(order.total_amount) : calculatedSubtotal + deliveryFee;
+  const finalTotal = calculatedSubtotal + deliveryFee;
   const currentIndex = order? Object.keys(STATUS_CONFIG).indexOf(order.delivery_status) : 0;
 
   return (
