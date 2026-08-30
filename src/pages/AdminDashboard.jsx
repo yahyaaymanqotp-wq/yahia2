@@ -168,45 +168,176 @@ export default function AdminDashboard() {
     }
   }
 
-  async function handleLogoUpload(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
+ async function handleLogoUpload(e) {
+  const file = e.target.files?.[0]
+  if (!file) return
 
-    if (!file.type.startsWith('image/')) {
-      alert('اختر صورة فقط')
-      return
-    }
-
-    if (file.size > 5 * 1024) {
-      alert('حجم الصورة كبير - الحد الأقصى 5MB')
-      return
-    }
-
-    setUploadingLogo(true)
-    try {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
-      const filePath = `shops/${fileName}`
-
-      const { error: uploadError } = await supabase.storage
-.from('shop-images')
-.upload(filePath, file)
-
-      if (uploadError) throw uploadError
-
-      const { data: { publicUrl } } = supabase.storage
-.from('shop-images')
-.getPublicUrl(filePath)
-
-      setShopForm(prev => ({...prev, logo_url: publicUrl }))
-    } catch (error) {
-      console.error('Upload error:', error)
-      alert('فشل رفع الصورة: ' + error.message)
-    } finally {
-      setUploadingLogo(false)
-    }
+  if (!file.type.startsWith('image/')) {
+    alert('اختر صورة فقط')
+    return
   }
 
+  setUploadingLogo(true)
+
+  try {
+    // ضغط الصورة قبل الرفع
+    const compressedFile = await compressImage(file, {
+      maxWidth: 1600,
+      maxHeight: 1600,
+      quality: 0.82,
+      maxSizeMB: 1
+    })
+
+    console.log(
+      `الحجم قبل الضغط: ${(file.size / 1024 / 1024).toFixed(2)} MB`
+    )
+
+    console.log(
+      `الحجم بعد الضغط: ${(compressedFile.size / 1024 / 1024).toFixed(2)} MB`
+    )
+
+    // تأكيد أن الصورة النهائية أقل من 5MB
+    if (compressedFile.size > 5 * 1024 * 1024) {
+      throw new Error('الصورة كبيرة جدًا حتى بعد الضغط')
+    }
+
+    // اسم الملف WebP
+    const fileName = `${Date.now()}-${Math.random()
+      .toString(36)
+      .substring(7)}.webp`
+
+    const filePath = `shops/${fileName}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('shop-images')
+      .upload(filePath, compressedFile, {
+        contentType: 'image/webp',
+        upsert: false
+      })
+
+    if (uploadError) throw uploadError
+
+    const {
+      data: { publicUrl }
+    } = supabase.storage
+      .from('shop-images')
+      .getPublicUrl(filePath)
+
+    setShopForm(prev => ({
+      ...prev,
+      logo_url: publicUrl
+    }))
+
+    alert(
+      `✅ تم رفع الصورة بنجاح\n\nالحجم الأصلي: ${(file.size / 1024 / 1024).toFixed(2)} MB\nالحجم بعد الضغط: ${(compressedFile.size / 1024 / 1024).toFixed(2)} MB`
+    )
+
+  } catch (error) {
+    console.error('Image upload error:', error)
+    alert('فشل رفع الصورة: ' + error.message)
+  } finally {
+    setUploadingLogo(false)
+
+    // يسمح باختيار نفس الصورة مرة أخرى
+    e.target.value = ''
+  }
+}
+
+
+// ضغط وتحويل الصورة إلى WebP
+async function compressImage(
+  file,
+  {
+    maxWidth = 1600,
+    maxHeight = 1600,
+    quality = 0.82,
+    maxSizeMB = 1
+  } = {}
+) {
+  const image = new Image()
+
+  const imageUrl = URL.createObjectURL(file)
+
+  try {
+    await new Promise((resolve, reject) => {
+      image.onload = resolve
+      image.onerror = reject
+      image.src = imageUrl
+    })
+
+    let width = image.width
+    let height = image.height
+
+    // تصغير الأبعاد مع الحفاظ على النسبة
+    if (width > maxWidth || height > maxHeight) {
+      const ratio = Math.min(
+        maxWidth / width,
+        maxHeight / height
+      )
+
+      width = Math.round(width * ratio)
+      height = Math.round(height * ratio)
+    }
+
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+
+    const ctx = canvas.getContext('2d')
+
+    // جودة أفضل للصورة
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
+
+    ctx.drawImage(image, 0, 0, width, height)
+
+    // تحويل إلى WebP
+    let qualityValue = quality
+    let blob = await canvasToWebP(canvas, qualityValue)
+
+    // لو الصورة أكبر من الحجم المطلوب نقلل الجودة تدريجيًا
+    while (
+      blob.size > maxSizeMB * 1024 * 1024 &&
+      qualityValue > 0.45
+    ) {
+      qualityValue -= 0.07
+
+      blob = await canvasToWebP(
+        canvas,
+        qualityValue
+      )
+    }
+
+    return new File(
+      [blob],
+      `${file.name.split('.')[0]}.webp`,
+      {
+        type: 'image/webp',
+        lastModified: Date.now()
+      }
+    )
+
+  } finally {
+    URL.revokeObjectURL(imageUrl)
+  }
+}
+
+
+function canvasToWebP(canvas, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      blob => {
+        if (blob) {
+          resolve(blob)
+        } else {
+          reject(new Error('تعذر ضغط الصورة'))
+        }
+      },
+      'image/webp',
+      quality
+    )
+  })
+}
   async function handleAddShop(e) {
     e.preventDefault()
 
