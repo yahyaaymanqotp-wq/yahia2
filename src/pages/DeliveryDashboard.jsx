@@ -107,6 +107,9 @@ export default function DeliveryDashboard() {
       if (ledgerRes.data) {
         setLedgerEarnings(parseFloat(ledgerRes.data.total_earnings || 0));
         setLedgerCount(parseInt(ledgerRes.data.total_orders || 0));
+      } else {
+        setLedgerEarnings(0);
+        setLedgerCount(0);
       }
     } catch (error) {
       showToast("فشل تحميل الطلبات: " + error.message, "error");
@@ -131,7 +134,6 @@ export default function DeliveryDashboard() {
       const { error } = await supabase.from("orders").update(updateData).eq("id", orderId);
       if (error) throw error;
 
-      // ✅ ده السطر اللي بيصلح مشكلة معلق في لوحة المحل
       await supabase.from("orders").update({
         delivery_status: next.status,
         updated_at: new Date().toISOString()
@@ -139,8 +141,6 @@ export default function DeliveryDashboard() {
 
       if (next.status === FINAL_STATUS) {
         const feeToSave = parseFloat(deliveryFee[orderId] || order.delivery_fee || 0);
-        const totalToSave = getOrderTotal({...order, delivery_fee: feeToSave});
-
         const { data: existingDel } = await supabase.from("delivery_profit_ledger").select("*").eq("company_id", deliveryCompanyId).maybeSingle();
         await supabase.from("delivery_profit_ledger").upsert({
           company_id: deliveryCompanyId.toString(),
@@ -168,38 +168,16 @@ export default function DeliveryDashboard() {
 
       showToast(`✅ ${next.label}`, "success");
 
-      // 🔔 اشعار للعميل من شركة التوصيل بس - زي ما طلبت
       try {
-        const clientMessage = next.status === 'delivered'
-         ? `تم توصيل طلبك #${orderId} بنجاح ✅ - شكرا لثقتك`
-          : `تحديث طلبك #${orderId} 🚚 - الحالة الآن: ${next.label}`;
-
-        // لو العميل عنده onesignal_id (هنحفظه في Checkout) ابعتله مباشر
+        const clientMessage = next.status === 'delivered'? `تم توصيل طلبك #${orderId} بنجاح ✅ - شكرا لثقتك` : `تحديث طلبك #${orderId} 🚚 - الحالة الآن: ${next.label}`;
         if (order.onesignal_id) {
           fetch('/api/sendNotification', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              playerId: order.onesignal_id,
-              title: `طلبك #${orderId}`,
-              message: clientMessage
-            })
-          });
-        } else {
-          // fallback: ابعت لكل العملاء او احفظه للتجربة
-          fetch('/api/sendNotification', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              targetRole: 'client',
-              title: `تحديث طلب #${orderId} 📦`,
-              message: `${order.customer_name} - ${clientMessage} - الاجمالي ${getOrderTotal(order).toFixed(2)}ج`
-            })
+            body: JSON.stringify({ playerId: order.onesignal_id, title: `طلبك #${orderId}`, message: clientMessage })
           });
         }
-      } catch (notifyErr) {
-        console.log('Notify error', notifyErr)
-      }
+      } catch (notifyErr) { console.log('Notify error', notifyErr) }
 
       loadOrders();
     } catch (error) {
@@ -210,24 +188,24 @@ export default function DeliveryDashboard() {
     }
   }
 
+  // === التعديل الوحيد هنا - نظام المكتملة الصح ===
   const stats = useMemo(() => {
     const total = orders.length;
     const active = orders.filter(o => o.delivery_status!== FINAL_STATUS && o.delivery_status!== "cancelled").length;
     const completed = orders.filter(o => o.delivery_status === FINAL_STATUS).length;
-    const currentRevenue = orders.filter(o => o.delivery_status === FINAL_STATUS).reduce((sum, o) => sum + (parseFloat(o.delivery_fee) || 0), 0);
-    const currentOrdersValue = orders.filter(o => o.delivery_status === FINAL_STATUS).reduce((sum, o) => sum + getOrderTotal(o), 0);
-    const revenue = ledgerEarnings > 0? ledgerEarnings : currentRevenue;
-    const totalValue = currentOrdersValue + (ledgerEarnings > currentRevenue? ledgerEarnings - currentRevenue : 0);
-    return { total, active, completed, revenue, totalValue, currentRevenue, currentOrdersValue };
+    const revenue = ledgerEarnings > 0? ledgerEarnings : orders.filter(o => o.delivery_status === FINAL_STATUS).reduce((sum, o) => sum + (parseFloat(o.delivery_fee) || 0), 0);
+    return { total, active, completed, revenue };
   }, [orders, ledgerEarnings]);
 
   const sortedAndFilteredOrders = useMemo(() => {
-    let filtered = orders.filter(order => {
-      const q = searchQuery.toLowerCase();
-      return (order.id?.toString().includes(q) || order.customer_name?.toLowerCase().includes(q) || order.customer_phone?.includes(q) || getShopName(order).toLowerCase().includes(q));
-    });
+    let filtered = [...orders];
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(order => order.id?.toString().toLowerCase().includes(q) || order.customer_name?.toLowerCase().includes(q) || order.customer_phone?.toString().includes(q) || getShopName(order).toLowerCase().includes(q));
+    }
     if (activeTab === "active") filtered = filtered.filter(o => o.delivery_status!== FINAL_STATUS && o.delivery_status!== "cancelled");
     else if (activeTab === "completed") filtered = filtered.filter(o => o.delivery_status === FINAL_STATUS);
+
     return filtered.sort((a, b) => {
       const aIsDone = a.delivery_status === FINAL_STATUS;
       const bIsDone = b.delivery_status === FINAL_STATUS;
@@ -285,7 +263,7 @@ export default function DeliveryDashboard() {
           </div>
           <div className="bg-[#1E1E1E] border border-[#333] rounded-2xl p-5">
             <div className="flex items-center justify-between mb-2"><span className="text-2xl">✅</span><span className="text-sm text-gray-400">المكتملة</span></div>
-            <p className="text-4xl font-black text-green-400">{stats.completed + ledgerCount}</p><p className="text-sm text-gray-500 mt-1">تم التسليم (شامل المحذوف)</p>
+            <p className="text-4xl font-black text-green-400">{stats.completed}</p><p className="text-sm text-gray-500 mt-1">تم التسليم</p>
           </div>
           <div className="bg-[#1E1E1E] border border-[#D4AF37]/30 rounded-2xl p-5">
             <div className="flex items-center justify-between mb-2"><span className="text-2xl">💰</span><span className="text-sm text-[#D4AF37]">الأرباح</span></div>
