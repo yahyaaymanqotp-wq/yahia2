@@ -111,38 +111,186 @@ export default function ShopDashboard() {
    }, 0)
   }
 
-  async function uploadFile(file) {
-    const fileExt = file.name.split('.').pop()
-    const fileName = `products/${shopId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
-    const { error } = await supabase.storage.from('shop-images').upload(fileName, file)
-    if (error) throw error
-    const { data: { publicUrl } } = supabase.storage.from('shop-images').getPublicUrl(fileName)
-    return publicUrl
+async function compressProductImage(file) {
+  const image = new Image()
+  const imageUrl = URL.createObjectURL(file)
+
+  try {
+    await new Promise((resolve, reject) => {
+      image.onload = resolve
+      image.onerror = reject
+      image.src = imageUrl
+    })
+
+    // كل صور المنتجات بنفس المقاس
+    const size = 800
+
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+
+    const ctx = canvas.getContext('2d')
+
+    // خلفية بيضاء
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, size, size)
+
+    // حساب المقاس بدون قص الصورة
+    const ratio = Math.min(
+      size / image.width,
+      size / image.height
+    )
+
+    const width = Math.round(image.width * ratio)
+    const height = Math.round(image.height * ratio)
+
+    // توسيط الصورة
+    const x = Math.round((size - width) / 2)
+    const y = Math.round((size - height) / 2)
+
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
+
+    // رسم الصورة كاملة بدون قص
+    ctx.drawImage(
+      image,
+      x,
+      y,
+      width,
+      height
+    )
+
+    let quality = 0.85
+
+    let blob = await new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (result) => {
+          if (result) resolve(result)
+          else reject(new Error('تعذر معالجة الصورة'))
+        },
+        'image/webp',
+        quality
+      )
+    })
+
+    // ضغط إضافي لو الحجم أكبر من 500KB
+    while (
+      blob.size > 500 * 1024 &&
+      quality > 0.5
+    ) {
+      quality -= 0.05
+
+      blob = await new Promise((resolve, reject) => {
+        canvas.toBlob(
+          (result) => {
+            if (result) resolve(result)
+            else reject(new Error('تعذر ضغط الصورة'))
+          },
+          'image/webp',
+          quality
+        )
+      })
+    }
+
+    return new File(
+      [blob],
+      `${file.name.split('.')[0]}.webp`,
+      {
+        type: 'image/webp',
+        lastModified: Date.now()
+      }
+    )
+
+  } finally {
+    URL.revokeObjectURL(imageUrl)
+  }
+}
+
+// رفع الصورة بعد الضغط
+async function uploadFile(file) {
+
+  const fileName =
+    `products/${shopId}/${Date.now()}-${Math.random()
+     .toString(36)
+     .substring(7)}.webp`
+
+  const { error } = await supabase.storage
+   .from('shop-images')
+   .upload(fileName, file, {
+      contentType: 'image/webp',
+      upsert: false
+    })
+
+  if (error) throw error
+
+  const {
+    data: { publicUrl }
+  } = supabase.storage
+   .from('shop-images')
+   .getPublicUrl(fileName)
+
+  return publicUrl
+}
+
+// اختيار الصورة وضغطها ثم رفعها
+async function handleImageUpload(e) {
+
+  const file = e.target.files?.[0]
+
+  if (!file) return
+
+  if (!file.type.startsWith('image/')) {
+    alert('اختر صورة فقط')
+    return
   }
 
-  async function handleImageUpload(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    
-    if (!file.type.startsWith('image/')) {
-      alert('اختر صورة فقط')
-      return
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      alert('حجم الصورة كبير - الحد الأقصى 5MB')
-      return
-    }
+  setUploadingImage(true)
 
-    setUploadingImage(true)
-    try {
-      const url = await uploadFile(file)
-      setFormData({...formData, image_url: url})
-    } catch (error) {
-      alert('فشل رفع الصورة: ' + error.message)
-    } finally {
-      setUploadingImage(false)
-    }
+  try {
+
+    // ضغط الصورة تلقائياً
+    const compressedFile =
+      await compressProductImage(file)
+
+    console.log(
+      'الحجم الأصلي:',
+      (file.size / 1024 / 1024).toFixed(2),
+      'MB'
+    )
+
+    console.log(
+      'الحجم بعد الضغط:',
+      (compressedFile.size / 1024 / 1024).toFixed(2),
+      'MB'
+    )
+
+    // رفع الصورة المضغوطة
+    const url =
+      await uploadFile(compressedFile)
+
+    setFormData(prev => ({
+     ...prev,
+      image_url: url
+    }))
+
+  } catch (error) {
+
+    console.error(error)
+
+    alert(
+      'فشل رفع الصورة: ' +
+      error.message
+    )
+
+  } finally {
+
+    setUploadingImage(false)
+
+    // يسمح برفع نفس الصورة مرة أخرى
+    e.target.value = ''
+
   }
+}
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -433,7 +581,13 @@ export default function ShopDashboard() {
                     <div className="flex gap-3">
                       <label className="flex-1 bg-[#121212] border border-[#333] border-dashed rounded-xl px-4 py-6 cursor-pointer hover:border-[#D4AF37] flex flex-col items-center gap-2">
                         {formData.image_url? (
-                          <img src={formData.image_url} className="w-32 h-32 rounded-lg object-cover" />
+                          <div className="w-32 h-32 bg-[#121212] rounded-lg flex items-center justify-center">
+                            <img
+                              src={formData.image_url}
+                              className="w-full h-full rounded-lg object-contain"
+                              alt="معاينة المنتج"
+                            />
+                          </div>
                         ) : (
                           <>
                             <Upload className="text-gray-400" size={32} />
@@ -485,11 +639,18 @@ export default function ShopDashboard() {
                     !product.image_url? 'scale-90 opacity-80' : ''
                     }`}
                   >
-                    {product.image_url? (
-                      <img src={product.image_url} alt={product.name} className="w-full h-48 object-cover" />
+                    {product.image_url ? (
+                      <div className="w-full aspect-square bg-white flex items-center justify-center overflow-hidden">
+                        <img
+                          src={product.image_url}
+                          alt={product.name}
+                          className="w-full h-full object-contain"
+                          loading="lazy"
+                        />
+                      </div>
                     ) : (
-                      <div className="w-full h-32 bg-[#121212] flex items-center justify-center">
-                        <ImageIcon size={32} className="text-gray-600" />
+                      <div className="w-full aspect-square bg-[#121212] flex items-center justify-center">
+                        <ImageIcon size={40} className="text-gray-600" />
                       </div>
                     )}
 

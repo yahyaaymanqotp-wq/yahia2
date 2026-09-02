@@ -20,11 +20,11 @@ export default function ShopPage() {
       setError(null)
 
       const { data: shopData, error: shopError } = await supabase
-  .from('shops')
-  .select('*, categories(name, icon)')
-  .eq('id', id)
-  .eq('is_active', true)
-  .single()
+.from('shops')
+.select('*, categories(name, icon)')
+.eq('id', id)
+.eq('is_active', true)
+.single()
 
       if (shopError) throw new Error('المحل غير موجود')
       if (!shopData) throw new Error('المحل غير موجود')
@@ -32,11 +32,11 @@ export default function ShopPage() {
       setShop(shopData)
 
       const { data: productsData, error: productsError } = await supabase
-  .from('products')
-  .select('*')
-  .eq('shop_id', id)
-  .eq('is_active', true)
-  .order('created_at', { ascending: false })
+.from('products')
+.select('*')
+.eq('shop_id', id)
+.eq('is_active', true)
+.order('created_at', { ascending: false })
 
       if (productsError) throw productsError
 
@@ -174,11 +174,12 @@ export default function ShopPage() {
                   className="bg-[#1E1E1E] border border-[#333] rounded-3xl overflow-hidden hover:border-[#D4AF37]/30 transition-all hover:scale-[1.02] flex flex-col"
                 >
                   {hasImage && (
-                    <div className="relative h-48 overflow-hidden bg-[#121212]">
+                    <div className="relative w-full aspect-square overflow-hidden bg-black flex items-center justify-center">
                       <img
                         src={product.image_url}
                         alt={product.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
+                        loading="lazy"
                       />
                       {hasDiscount && (
                         <span className="absolute top-3 right-3 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full">
