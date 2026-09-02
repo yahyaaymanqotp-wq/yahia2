@@ -130,11 +130,9 @@ async function compressProductImage(file) {
     canvas.height = size
 
     const ctx = canvas.getContext('2d')
-
-    // خلفية بيضاء
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, size, size)
-
+// خلفية سوداء
+ctx.fillStyle = '#000000'
+ctx.fillRect(0, 0, size, size)
     // حساب المقاس بدون قص الصورة
     const ratio = Math.min(
       size / image.width,
