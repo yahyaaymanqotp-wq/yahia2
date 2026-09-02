@@ -13,6 +13,7 @@ export default function AdminDashboard() {
   const [companyEarnings, setCompanyEarnings] = useState({})
 
   const [showAddShop, setShowAddShop] = useState(false)
+  const [editingShop, setEditingShop] = useState(null)
   const [showAddCompany, setShowAddCompany] = useState(false)
   const [editingCompany, setEditingCompany] = useState(null)
   const [submitting, setSubmitting] = useState(false)
@@ -203,14 +204,14 @@ export default function AdminDashboard() {
 
     // اسم الملف WebP
     const fileName = `${Date.now()}-${Math.random()
-      .toString(36)
-      .substring(7)}.webp`
+     .toString(36)
+     .substring(7)}.webp`
 
     const filePath = `shops/${fileName}`
 
     const { error: uploadError } = await supabase.storage
-      .from('shop-images')
-      .upload(filePath, compressedFile, {
+     .from('shop-images')
+     .upload(filePath, compressedFile, {
         contentType: 'image/webp',
         upsert: false
       })
@@ -220,11 +221,11 @@ export default function AdminDashboard() {
     const {
       data: { publicUrl }
     } = supabase.storage
-      .from('shop-images')
-      .getPublicUrl(filePath)
+     .from('shop-images')
+     .getPublicUrl(filePath)
 
     setShopForm(prev => ({
-      ...prev,
+     ...prev,
       logo_url: publicUrl
     }))
 
@@ -242,7 +243,6 @@ export default function AdminDashboard() {
     e.target.value = ''
   }
 }
-
 
 // ضغط وتحويل الصورة إلى WebP
 async function compressImage(
@@ -322,7 +322,6 @@ async function compressImage(
   }
 }
 
-
 function canvasToWebP(canvas, quality) {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
@@ -338,64 +337,142 @@ function canvasToWebP(canvas, quality) {
     )
   })
 }
-  async function handleAddShop(e) {
-    e.preventDefault()
 
-    if (!shopForm.name.trim() ||!shopForm.category_id ||!shopForm.username.trim() ||!shopForm.password.trim()) {
-      alert('املأ الحقول المطلوبة: الاسم، القسم، اليوزرنيم، الباسورد')
-      return
-    }
-    if (shopForm.password.length < 6) {
-      alert('الباسورد لازم 6 حروف على الأقل')
-      return
+function handleEditShop(shop) {
+  setEditingShop(shop)
+
+  setShopForm({
+    name: shop.name || '',
+    category_id: shop.category_id || '',
+    description: shop.description || '',
+    address: shop.address || '',
+    phone: shop.phone || '',
+    logo_url: shop.logo_url || '',
+    cover_image_url: shop.cover_image_url || '',
+    username: shop.username || '',
+    password: shop.password || ''
+  })
+
+  setShowAddShop(true)
+}
+
+function resetShopForm() {
+  setShopForm({
+    name: '',
+    category_id: categories[0]?.id || '',
+    description: '',
+    address: '',
+    phone: '',
+    logo_url: '',
+    cover_image_url: '',
+    username: '',
+    password: ''
+  })
+
+  setEditingShop(null)
+  setShowAddShop(false)
+}
+
+async function handleAddShop(e) {
+  e.preventDefault()
+
+  if (
+   !shopForm.name.trim() ||
+   !shopForm.category_id ||
+   !shopForm.username.trim() ||
+   !shopForm.password.trim()
+  ) {
+    alert('املأ الحقول المطلوبة: الاسم، القسم، اليوزرنيم، الباسورد')
+    return
+  }
+
+  if (shopForm.password.length < 6) {
+    alert('الباسورد لازم 6 حروف على الأقل')
+    return
+  }
+
+  setSubmitting(true)
+
+  try {
+
+    const shopData = {
+      name: shopForm.name.trim(),
+      category_id: shopForm.category_id,
+      description: shopForm.description.trim() || null,
+      address: shopForm.address.trim() || null,
+      phone: shopForm.phone.trim() || null,
+      logo_url: shopForm.logo_url || null,
+      cover_image_url: shopForm.cover_image_url || null,
+      username: shopForm.username.trim(),
+      password: shopForm.password
     }
 
-    setSubmitting(true)
-    try {
-      const { data, error } = await supabase.from('shops').insert({
-        name: shopForm.name.trim(),
-        category_id: shopForm.category_id,
-        description: shopForm.description.trim() || null,
-        address: shopForm.address.trim() || null,
-        phone: shopForm.phone.trim() || null,
-        logo_url: shopForm.logo_url || null,
-        cover_image_url: shopForm.cover_image_url || null,
-        username: shopForm.username.trim(),
-        password: shopForm.password,
-        is_active: true,
-        is_verified: true,
-        rating: 5.0
-      }).select()
+    // ✏️ تعديل محل موجود
+    if (editingShop) {
+
+      const { error } = await supabase
+       .from('shops')
+       .update(shopData)
+       .eq('id', editingShop.id)
 
       if (error) {
         if (error.code === '23505') {
-          throw new Error('اليوزرنيم ده موجود بالفعل')
+          throw new Error('اسم المستخدم موجود بالفعل')
         }
+
         throw error
       }
 
-      alert(`✅ تم إضافة المحل بنجاح!\n\nاسم المحل: ${shopForm.name}\nاليوزرنيم: ${shopForm.username}\nالباسورد: ${shopForm.password}`)
+      alert('✅ تم تعديل بيانات المحل بنجاح')
 
-      setShopForm({
-        name: '',
-        category_id: categories[0]?.id || '',
-        description: '',
-        address: '',
-        phone: '',
-        logo_url: '',
-        cover_image_url: '',
-        username: '',
-        password: ''
-      })
-      setShowAddShop(false)
-      loadData()
-    } catch (error) {
-      console.error('Error:', error)
-      alert('خطأ: ' + error.message)
-    } finally {
-      setSubmitting(false)
     }
+
+    // ➕ إضافة محل جديد
+    else {
+
+      const { error } = await supabase
+       .from('shops')
+       .insert({
+         ...shopData,
+          is_active: true,
+          is_verified: true,
+          rating: 5.0
+        })
+
+      if (error) {
+
+        if (error.code === '23505') {
+          throw new Error('اليوزرنيم ده موجود بالفعل')
+        }
+
+        throw error
+      }
+
+      alert(
+        `✅ تم إضافة المحل بنجاح!
+
+اسم المحل: ${shopForm.name}
+اليوزرنيم: ${shopForm.username}
+الباسورد: ${shopForm.password}`
+      )
+    }
+
+    resetShopForm()
+
+    loadData()
+
+  } catch (error) {
+
+    console.error('Error:', error)
+
+    alert('خطأ: ' + error.message)
+
+  } finally {
+
+    setSubmitting(false)
+
   }
+}
 
   async function handleAddCompany(e) {
     e.preventDefault()
@@ -587,7 +664,21 @@ function canvasToWebP(canvas, quality) {
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl md:text-2xl font-bold">المحلات</h2>
               <button
-                onClick={() => setShowAddShop(true)}
+                onClick={() => {
+                  setEditingShop(null)
+                  setShopForm({
+                    name: '',
+                    category_id: categories[0]?.id || '',
+                    description: '',
+                    address: '',
+                    phone: '',
+                    logo_url: '',
+                    cover_image_url: '',
+                    username: '',
+                    password: ''
+                  })
+                  setShowAddShop(true)
+                }}
                 className="bg-[#D4AF37] text-black px-3 md:px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm md:text-base"
               >
                 <Plus size={18} />
@@ -607,16 +698,25 @@ function canvasToWebP(canvas, quality) {
                       <p className="text-xs md:text-sm text-gray-400">{shop.categories?.name}</p>
                       <p className="text-xs text-gray-500 truncate">@{shop.username}</p>
                     </div>
-                    <button
-                      onClick={() => toggleShopStatus(shop.id, shop.is_active)}
-                      className={`px-2 md:px-3 py-1 rounded-lg text-xs md:text-sm font-bold flex-shrink-0 ${
-                        shop.is_active
-              ? 'bg-green-500/20 text-green-400'
-                        : 'bg-red-500/20 text-red-400'
-                      }`}
-                    >
-                      {shop.is_active? 'نشط' : 'موقوف'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => toggleShopStatus(shop.id, shop.is_active)}
+                        className={`px-2 md:px-3 py-1 rounded-lg text-xs md:text-sm font-bold ${
+                          shop.is_active
+                           ? 'bg-green-500/20 text-green-400'
+                            : 'bg-red-500/20 text-red-400'
+                        }`}
+                      >
+                        {shop.is_active? 'نشط' : 'موقوف'}
+                      </button>
+                      <button
+                        onClick={() => handleEditShop(shop)}
+                        className="flex items-center justify-center gap-1 bg-[#D4AF37]/20 text-[#D4AF37] px-3 py-1 rounded-lg hover:bg-[#D4AF37]/30 transition text-xs"
+                      >
+                        <Edit size={14} />
+                        تعديل
+                      </button>
+                    </div>
                   </div>
                   <div className="bg-[#1E1E1E] border border-[#D4AF37]/30 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
@@ -664,7 +764,7 @@ function canvasToWebP(canvas, quality) {
                         onClick={() => toggleCompanyStatus(company.id, company.is_active)}
                         className={`px-3 py-1 rounded-lg text-xs font-bold ${
                           company.is_active
-                  ? 'bg-green-500/20 text-green-400'
+                 ? 'bg-green-500/20 text-green-400'
                             : 'bg-red-500/20 text-red-400'
                         }`}
                       >
@@ -725,8 +825,10 @@ function canvasToWebP(canvas, quality) {
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
             <div className="bg-[#1E1E1E] border border-[#333] rounded-2xl p-6 md:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl md:text-2xl font-bold text-[#D4AF37]">إضافة محل جديد</h2>
-                <button onClick={() => setShowAddShop(false)}><X size={24} /></button>
+                <h2 className="text-xl md:text-2xl font-bold text-[#D4AF37]">
+                  {editingShop? 'تعديل بيانات المحل' : 'إضافة محل جديد'}
+                </h2>
+                <button onClick={resetShopForm}><X size={24} /></button>
               </div>
 
               <form onSubmit={handleAddShop} className="space-y-4">
@@ -737,7 +839,26 @@ function canvasToWebP(canvas, quality) {
                 <input type="tel" placeholder="رقم الهاتف" value={shopForm.phone} onChange={(e) => setShopForm({...shopForm, phone: e.target.value})} className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3" />
                 <div><label className="block text-sm text-gray-400 mb-2">لوجو المحل</label><div className="flex items-center gap-4">{shopForm.logo_url && (<img src={shopForm.logo_url} className="w-16 h-16 md:w-20 md:h-20 rounded-lg object-cover" alt="" />)}<label className="flex-1 cursor-pointer"><div className="bg-[#121212] border border-[#333] border-dashed rounded-xl px-4 py-3 text-center hover:border-[#D4AF37] transition">{uploadingLogo? (<span className="text-[#D4AF37]">جاري الرفع...</span>) : (<span className="flex items-center justify-center gap-2 text-sm md:text-base"><Upload size={18} />اختر صورة</span>)}</div><input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" disabled={uploadingLogo} /></label></div></div>
                 <div className="border-t border-[#333] pt-4"><p className="text-sm text-gray-400 mb-3">بيانات الدخول للمحل</p><input type="text" placeholder="اسم المستخدم *" value={shopForm.username} onChange={(e) => setShopForm({...shopForm, username: e.target.value})} className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3 mb-3" required /><input type="password" placeholder="كلمة المرور * (6 حروف على الأقل)" value={shopForm.password} onChange={(e) => setShopForm({...shopForm, password: e.target.value})} className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3" required minLength={6} /></div>
-                <div className="flex gap-3 pt-4"><button type="submit" disabled={submitting || uploadingLogo} className="flex-1 bg-[#D4AF37] text-black py-3 rounded-xl font-bold hover:bg-[#D4AF37]/90 disabled:opacity-50">{submitting? 'جاري الإضافة...' : 'إضافة المحل'}</button><button type="button" onClick={() => setShowAddShop(false)} className="flex-1 bg-[#333] text-white py-3 rounded-xl font-bold">إلغاء</button></div>
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="submit"
+                    disabled={submitting || uploadingLogo}
+                    className="flex-1 bg-[#D4AF37] text-black py-3 rounded-xl font-bold hover:bg-[#D4AF37]/90 disabled:opacity-50"
+                  >
+                    {submitting
+                     ? 'جاري الحفظ...'
+                      : editingShop
+                       ? 'حفظ التعديلات'
+                        : 'إضافة المحل'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetShopForm}
+                    className="flex-1 bg-[#333] text-white py-3 rounded-xl font-bold"
+                  >
+                    إلغاء
+                  </button>
+                </div>
               </form>
             </div>
           </div>
