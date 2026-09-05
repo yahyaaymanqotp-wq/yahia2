@@ -30,6 +30,22 @@ export default function ShopDashboard() {
       window.location.href = '/login'
       return
     }
+
+    // 🔔 تسجيل المحل في OneSignal - مهم جدا
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+      try {
+        console.log("Logging shop:", shopId);
+        await OneSignal.login(shopId.toString());
+        await OneSignal.User.addTag("role", "shop");
+        await OneSignal.User.addTag("shop_id", shopId.toString());
+        await OneSignal.User.PushSubscription.optIn();
+        console.log("Shop OneSignal ID:", OneSignal.User.PushSubscription.id);
+      } catch (e) {
+        console.log("OneSignal Shop Error:", e);
+      }
+    });
+
     loadShopData()
     loadData()
     
@@ -122,34 +138,23 @@ async function compressProductImage(file) {
       image.src = imageUrl
     })
 
-    // كل صور المنتجات بنفس المقاس
     const size = 800
-
     const canvas = document.createElement('canvas')
     canvas.width = size
     canvas.height = size
-
     const ctx = canvas.getContext('2d')
-// خلفية سوداء
 ctx.fillStyle = '#000000'
 ctx.fillRect(0, 0, size, size)
-    // حساب المقاس بدون قص الصورة
     const ratio = Math.min(
       size / image.width,
       size / image.height
     )
-
     const width = Math.round(image.width * ratio)
     const height = Math.round(image.height * ratio)
-
-    // توسيط الصورة
     const x = Math.round((size - width) / 2)
     const y = Math.round((size - height) / 2)
-
     ctx.imageSmoothingEnabled = true
     ctx.imageSmoothingQuality = 'high'
-
-    // رسم الصورة كاملة بدون قص
     ctx.drawImage(
       image,
       x,
@@ -157,9 +162,7 @@ ctx.fillRect(0, 0, size, size)
       width,
       height
     )
-
     let quality = 0.85
-
     let blob = await new Promise((resolve, reject) => {
       canvas.toBlob(
         (result) => {
@@ -170,14 +173,11 @@ ctx.fillRect(0, 0, size, size)
         quality
       )
     })
-
-    // ضغط إضافي لو الحجم أكبر من 500KB
     while (
       blob.size > 500 * 1024 &&
       quality > 0.5
     ) {
       quality -= 0.05
-
       blob = await new Promise((resolve, reject) => {
         canvas.toBlob(
           (result) => {
@@ -189,7 +189,6 @@ ctx.fillRect(0, 0, size, size)
         )
       })
     }
-
     return new File(
       [blob],
       `${file.name.split('.')[0]}.webp`,
@@ -198,106 +197,66 @@ ctx.fillRect(0, 0, size, size)
         lastModified: Date.now()
       }
     )
-
   } finally {
     URL.revokeObjectURL(imageUrl)
   }
 }
 
-// رفع الصورة بعد الضغط
 async function uploadFile(file) {
-
   const fileName =
     `products/${shopId}/${Date.now()}-${Math.random()
      .toString(36)
      .substring(7)}.webp`
-
   const { error } = await supabase.storage
    .from('shop-images')
    .upload(fileName, file, {
       contentType: 'image/webp',
       upsert: false
     })
-
   if (error) throw error
-
   const {
     data: { publicUrl }
   } = supabase.storage
    .from('shop-images')
    .getPublicUrl(fileName)
-
   return publicUrl
 }
 
-// اختيار الصورة وضغطها ثم رفعها
 async function handleImageUpload(e) {
-
   const file = e.target.files?.[0]
-
   if (!file) return
-
   if (!file.type.startsWith('image/')) {
     alert('اختر صورة فقط')
     return
   }
-
   setUploadingImage(true)
-
   try {
-
-    // ضغط الصورة تلقائياً
     const compressedFile =
       await compressProductImage(file)
-
-    console.log(
-      'الحجم الأصلي:',
-      (file.size / 1024 / 1024).toFixed(2),
-      'MB'
-    )
-
-    console.log(
-      'الحجم بعد الضغط:',
-      (compressedFile.size / 1024 / 1024).toFixed(2),
-      'MB'
-    )
-
-    // رفع الصورة المضغوطة
     const url =
       await uploadFile(compressedFile)
-
     setFormData(prev => ({
      ...prev,
       image_url: url
     }))
-
   } catch (error) {
-
     console.error(error)
-
     alert(
       'فشل رفع الصورة: ' +
       error.message
     )
-
   } finally {
-
     setUploadingImage(false)
-
-    // يسمح برفع نفس الصورة مرة أخرى
     e.target.value = ''
-
   }
 }
 
   async function handleSubmit(e) {
     e.preventDefault()
-
     if (!formData.name.trim() ||!formData.price) {
       alert('املأ اسم المنتج والسعر')
       return
     }
-
     const productData = {
       shop_id: shopId,
       name: formData.name.trim(),
@@ -311,7 +270,6 @@ async function handleImageUpload(e) {
       category: formData.category.trim() || null,
       is_active: true
     }
-
     try {
       if (editingProduct) {
         const { error } = await supabase
@@ -328,7 +286,6 @@ async function handleImageUpload(e) {
         if (error) throw error
         alert('✅ تم إضافة المنتج')
       }
-
       resetForm()
       loadProducts()
     } catch (error) {

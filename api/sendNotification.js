@@ -1,31 +1,31 @@
 export default async function handler(req, res) {
-  if (req.method!== 'POST') return res.status(405).end();
-  const { title, message, playerId, targetId, targetRole } = req.body;
+  const { targetId, targetRole, title, message } = req.body;
 
-  let body = {
+  let json = {
     app_id: process.env.ONESIGNAL_APP_ID,
-    headings: { ar: title, en: title },
-    contents: { ar: message, en: message },
+    headings: { en: title },
+    contents: { en: message },
   };
 
-  if(playerId) body.include_subscription_ids = [playerId];
-  else if(targetId) {
-    body.include_external_user_ids = [targetId];
-    body.channel_for_external_user_ids = "push";
+  if (targetId) {
+    json.include_external_user_ids = [targetId];
+    json.channel_for_external_user_ids = "push";
+  } else if (targetRole) {
+    json.filters = [{ field: "tag", key: "role", relation: "=", value: targetRole }];
   }
-  else if(targetRole) {
-    body.filters = [{ field: "tag", key: "role", relation: "=", value: targetRole }];
-  }
-  else body.included_segments = ["All"];
 
-  const r = await fetch('https://api.onesignal.com/notifications', {
-    method: 'POST',
+  const r = await fetch("https://onesignal.com/api/v1/notifications", {
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Basic ${process.env.ONESIGNAL_REST_API_KEY}`
+      "Content-Type": "application/json",
+      "Authorization": `Basic ${process.env.ONESIGNAL_REST_API_KEY}`
     },
-    body: JSON.stringify(body)
+    body: JSON.stringify(json)
   });
+
   const data = await r.json();
-  res.status(200).json(data);
+  console.log("OneSignal Send:", JSON.stringify(data));
+  console.log("Target:", targetId || targetRole);
+
+  return res.status(200).json(data);
 }

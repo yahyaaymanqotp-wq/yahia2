@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "../lib/supabase";
-import { Truck, Phone, EyeOff, LogOut, TrendingUp, CheckCircle, Clock, Package, Store, Trash2, Search } from "lucide-react";
+import { Truck, Phone, EyeOff, LogOut, TrendingUp, CheckCircle, Clock, Package, Store, Trash2, Search, MapPinned, ExternalLink } from "lucide-react";
 
 const ORDER_FLOW = [
   { status: "pending", icon: "🆕", color: "bg-gray-500", label: "طلب جديد" },
@@ -28,6 +28,23 @@ export default function DeliveryDashboard() {
   const deliveryCompanyId = localStorage.getItem('delivery_company_id');
   const companyName = localStorage.getItem('delivery_company_name');
 
+  // 🔔 تسجيل التوصيل في OneSignal
+  useEffect(() => {
+    if (!deliveryCompanyId) return;
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+      try {
+        await OneSignal.login(deliveryCompanyId.toString());
+        await OneSignal.User.addTag("role", "delivery");
+        await OneSignal.User.addTag("company_id", deliveryCompanyId.toString());
+        await OneSignal.User.PushSubscription.optIn();
+        console.log("Delivery OneSignal ID:", OneSignal.User.PushSubscription.id);
+      } catch (e) {
+        console.log("OneSignal Delivery Error:", e);
+      }
+    });
+  }, [deliveryCompanyId]);
+
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
@@ -38,6 +55,13 @@ export default function DeliveryDashboard() {
     const str = phone.toString();
     if (str.length < 8) return str;
     return str.slice(0, 3) + "****" + str.slice(-4);
+  };
+
+  // 👇 دالة تطلع لينك الخريطة من العنوان
+  const getMapLink = (address) => {
+    if (!address) return null;
+    const match = address.match(/(https?:\/\/[^\s]+)/);
+    return match? match[0] : null;
   };
 
   const getShopName = (order) => {
@@ -188,7 +212,6 @@ export default function DeliveryDashboard() {
     }
   }
 
-  // === التعديل الوحيد هنا - نظام المكتملة الصح ===
   const stats = useMemo(() => {
     const total = orders.length;
     const active = orders.filter(o => o.delivery_status!== FINAL_STATUS && o.delivery_status!== "cancelled").length;
@@ -297,6 +320,7 @@ export default function DeliveryDashboard() {
                 itemsByShop[sName].subtotal += (parseFloat(item.price) || 0) * (parseFloat(item.quantity) || 1);
               });
               const shopGroups = Object.values(itemsByShop);
+              const mapLink = getMapLink(order.customer_address);
 
               return (
                 <div key={order.id} className={`bg-[#1E1E1E] border border-[#333] rounded-2xl p-6 transition-all ${isDone? 'opacity-70' : 'hover:border-[#D4AF37]/30'}`}>
@@ -310,7 +334,22 @@ export default function DeliveryDashboard() {
                     <div className="bg-[#121212] border border-[#333] rounded-xl p-4"><p className="text-sm text-gray-500 font-bold mb-1">👤 اسم العميل</p><p className="font-black text-white text-lg">{order.customer_name || "غير متوفر"}</p></div>
                     <div className="bg-[#121212] border border-[#333] rounded-xl p-4"><p className="text-sm text-gray-500 font-bold mb-1">📱 رقم الهاتف</p><div className="flex items-center gap-2"><p className="font-mono font-black text-white text-lg" dir="ltr">{showPhone[order.id]? (order.customer_phone || "غير متوفر") : maskPhone(order.customer_phone)}</p><button onClick={() => setShowPhone(prev => ({...prev, [order.id]:!prev[order.id]}))} className="text-[#D4AF37] text-sm font-bold">{showPhone[order.id]? '🙈' : '👁️'}</button></div></div>
                     <div className="bg-[#121212] border border-[#333] rounded-xl p-4"><p className="text-sm text-gray-500 font-bold mb-1">💰 الإجمالي شامل التوصيل</p><p className="font-black text-[#D4AF37] text-2xl">{orderTotal.toLocaleString()} ج.م</p><p className="text-xs text-gray-500 mt-1">المنتجات: {itemsTotal.toLocaleString()} + {parseFloat(order.delivery_fee || 0).toLocaleString()} توصيل</p></div>
-                    <div className="bg-[#121212] border border-[#333] rounded-xl p-4 md:col-span-2"><p className="text-sm text-gray-500 font-bold mb-1">📍 عنوان التوصيل</p><p className="font-bold text-white">{order.customer_address || "غير متوفر"}</p>{order.notes && <p className="text-sm text-gray-400 mt-2 bg-[#1E1E1E] p-2 rounded border border-[#333]">📝 {order.notes}</p>}</div>
+
+                    {/* العنوان مع زرار الخريطة */}
+                    <div className="bg-[#121212] border border-[#333] rounded-xl p-4 md:col-span-2">
+                      <p className="text-sm text-gray-500 font-bold mb-1">📍 عنوان التوصيل</p>
+                      <p className="font-bold text-white mb-2">{order.customer_address? order.customer_address.replace(/https?:\/\/[^\s]+/g, '').trim() || "موقع على الخريطة" : "غير متوفر"}</p>
+
+                      {mapLink && (
+                        <a href={mapLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-[#D4AF37] text-black px-4 py-2 rounded-xl font-black text-sm hover:bg-[#D4AF37]/90 transition">
+                          <MapPinned size={18} />
+                          افتح الموقع على الخريطة
+                          <ExternalLink size={14} />
+                        </a>
+                      )}
+
+                      {order.notes && <p className="text-sm text-gray-400 mt-3 bg-[#1E1E1E] p-2 rounded border border-[#333]">📝 {order.notes}</p>}
+                    </div>
                   </div>
 
                   <div className="mb-6">
