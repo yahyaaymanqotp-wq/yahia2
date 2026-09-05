@@ -7,10 +7,11 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      includeAssets: ['favicon.png'],
       manifest: {
         name: 'سوق فاقوس',
         short_name: 'سوق فاقوس',
-        description: 'أول سوق إلكتروني يجمع محلات فاقوس',
+        description: 'كل محلات مدينتك في مكان واحد',
         theme_color: '#111827',
         background_color: '#ffffff',
         display: 'standalone',
