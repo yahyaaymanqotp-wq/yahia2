@@ -1,7 +1,7 @@
 import { supabase } from "../lib/supabase";
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { ShoppingCart, User, Phone, MapPin, FileText, ArrowRight, Store, Truck, CheckCircle } from "lucide-react";
+import { ShoppingCart, User, Phone, MapPin, FileText, ArrowRight, Store, Truck, CheckCircle, Navigation } from "lucide-react";
 
 export default function Checkout() {
   const navigate = useNavigate();
@@ -9,6 +9,7 @@ export default function Checkout() {
   const [cart, setCart] = useState([]);
   const [shopsMap, setShopsMap] = useState({});
   const [showSuccess, setShowSuccess] = useState(null);
+  const [locating, setLocating] = useState(false);
   const [form, setForm] = useState({
     name: "",
     phone: "",
@@ -24,8 +25,8 @@ export default function Checkout() {
   async function loadShops() {
     try {
       const { data, error } = await supabase
-  .from("shops")
-  .select("id, name, delivery_fee, min_order");
+ .from("shops")
+ .select("id, name, delivery_fee, min_order");
       if (error) return;
       const map = {};
       data?.forEach(shop => {
@@ -47,6 +48,27 @@ export default function Checkout() {
 ...form,
       [e.target.name]: e.target.value,
     });
+  }
+
+  function handleGetLocation() {
+    if (!navigator.geolocation) {
+      alert("المتصفح لا يدعم تحديد الموقع");
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const link = `https://www.google.com/maps?q=${latitude},${longitude}`;
+        setForm(prev => ({...prev, address: prev.address? `${prev.address}\n${link}` : link }));
+        setLocating(false);
+      },
+      () => {
+        alert("مقدرناش نحدد موقعك، فعل الـ GPS");
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   }
 
   const groupedByShop = useMemo(() => {
@@ -103,49 +125,9 @@ export default function Checkout() {
     }
     setSubmitting(true);
     try {
-      // 🔔 نمسك ID بتاع العميل - النسخة المصححة
-      let onesignalId = null;
-      try {
-        window.OneSignalDeferred = window.OneSignalDeferred || [];
-        await new Promise((resolve) => {
-          OneSignalDeferred.push(async function (OneSignal) {
-            try {
-              console.log('Checking permission...');
-              const permission = await OneSignal.Notifications.permission;
-
-              if (!permission) {
-                console.log('Requesting permission...');
-                await OneSignal.Notifications.requestPermission();
-              }
-
-              // اهم سطر: نجبره يعمل Subscribe
-              console.log('Opting in...');
-              await OneSignal.User.PushSubscription.optIn();
-
-              // نستنى 3 ثواني عشان الـ ID يجهز
-              await new Promise(r => setTimeout(r, 3000));
-
-              onesignalId = OneSignal.User.PushSubscription.id;
-              console.log('OneSignal ID:', onesignalId);
-            } catch (e) {
-              console.log('OneSignal Error:', e);
-            }
-            resolve();
-          });
-        });
-      } catch (e) {
-        console.log('OneSignal Init Error:', e);
-      }
-
-      if (!onesignalId) {
-        alert("لازم تفعل الاشعارات عشان تتابع طلبك. اتأكد انك فاتح https ومش وضع تصفح خفي");
-        setSubmitting(false);
-        return;
-      }
-
       const { data: mainOrder, error: mainError } = await supabase
-  .from("orders")
-  .insert({
+ .from("orders")
+ .insert({
           shop_id: null,
           customer_name: form.name.trim(),
           customer_phone: form.phone.trim(),
@@ -156,10 +138,9 @@ export default function Checkout() {
           total_amount: total,
           delivery_status: "pending",
           payment_status: "pending",
-          onesignal_id: onesignalId
         })
-  .select()
-  .single();
+ .select()
+ .single();
       if (mainError) throw mainError;
 
       const mainOrderItems = cart.map(item => ({
@@ -179,8 +160,8 @@ export default function Checkout() {
         const shopDeliveryFee = parseFloat(shop.shopData?.delivery_fee || 0)
         const shopTotal = shop.subtotal + shopDeliveryFee
         const { data: orderData, error: orderError } = await supabase
-    .from("orders")
-    .insert({
+   .from("orders")
+   .insert({
             shop_id: shop.shopId,
             parent_order_id: mainOrder.id,
             customer_name: form.name.trim(),
@@ -192,10 +173,9 @@ export default function Checkout() {
             total_amount: shopTotal,
             delivery_status: "pending",
             payment_status: "pending",
-            onesignal_id: onesignalId
           })
-    .select()
-    .single();
+   .select()
+   .single();
         if (orderError) throw orderError;
         const orderItems = shop.items.map(item => ({
           order_id: orderData.id,
@@ -211,7 +191,6 @@ export default function Checkout() {
         if (itemsError) throw itemsError;
       }
 
-      // ✅ نقص المخزون بعد تأكيد الطلب
       for (const item of cart) {
         const { data: prod } = await supabase.from("products").select("stock").eq("id", item.product_id).single();
         if (prod) {
@@ -220,14 +199,14 @@ export default function Checkout() {
         }
       }
 
-      // 🔔 الاشعارات - الصح - غير محجوبة
-      // نظهر النجاح للعميل فورا قبل الاشعارات
-      
-    
+      // ✅ عرض النجاح فورا
+      localStorage.removeItem("cart");
+      window.dispatchEvent(new Event('cartUpdated'));
+      setShowSuccess({ id: mainOrder.id, total: total.toFixed(2), count: totalItems });
+      setSubmitting(false);
 
-      // الاشعارات في الخلفية - مش هنعملها await
+      // 🔔 الاشعارات - الصح: العميل SMS بس، المحل والتوصيل OneSignal
       try {
-        // 1- للعميل: SMS - fire and forget
         fetch('/api/sendSMS', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -235,9 +214,8 @@ export default function Checkout() {
             phone: form.phone.trim(),
             message: `سوق فاقوس: تم استلام طلبك #${mainOrder.id} بنجاح - الاجمالي ${total.toFixed(2)}ج`
           })
-        }).catch(e=>console.log('SMS err',e));
+        }).catch(()=>{});
 
-        // 2- للمحلات
         groupedByShop.forEach(shop => {
           fetch('/api/sendNotification', {
             method: 'POST',
@@ -247,17 +225,16 @@ export default function Checkout() {
               title: 'عندك طلب جديد 🔔',
               message: `طلب #${mainOrder.id} بـ ${shop.subtotal.toFixed(2)}ج من ${form.name}`
             })
-          }).catch(e=>console.log('Shop notify err',e));
+          }).catch(()=>{});
         });
 
-        // 3- للتوصيل والادمن
         fetch('/api/sendNotification', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             targetRole: 'delivery',
             title: 'طلب جديد للتوصيل 📦',
-            message: `طلب #${mainOrder.id} - ${form.name} - ${form.phone}`
+            message: `طلب #${mainOrder.id} - العميل: ${form.name} - فون: ${form.phone} - العنوان: ${form.address} - الاجمالي: ${total.toFixed(2)}ج`
           })
         }).catch(()=>{});
 
@@ -267,7 +244,7 @@ export default function Checkout() {
           body: JSON.stringify({
             targetRole: 'admin',
             title: 'اوردر جديد 🛒',
-            message: `اوردر #${mainOrder.id} من ${form.name}`
+            message: `اوردر #${mainOrder.id} من ${form.name} - ${total.toFixed(2)}ج - ${groupedByShop.length} محل`
           })
         }).catch(()=>{});
 
@@ -275,12 +252,11 @@ export default function Checkout() {
         console.log('Notify error', notifyErr)
       }
 
-      return; // مهم عشان ميكملش للـ finally
-     
+      return;
+
     } catch (error) {
       console.error(error);
       alert("حدث خطأ أثناء حفظ الطلب: " + error.message);
-    } finally {
       setSubmitting(false);
     }
   }
@@ -352,9 +328,14 @@ export default function Checkout() {
                   <input type="tel" name="phone" value={form.phone} placeholder="01xxxxxxxxx" maxLength={11} inputMode="numeric" onChange={(e) => { const value = e.target.value.replace(/\D/g, ""); setForm({...form, phone: value }); }} className="w-full rounded-xl p-4 bg-[#121212] text-white border border-[#333] focus:border-[#D4AF37] focus:outline-none" required />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2 flex items-center gap-2"><MapPin size={16} />العنوان بالتفصيل أو لينك الموقع على الخريطة *</label>
-                  <textarea name="address" value={form.address} placeholder="مثال: شارع التحرير، عمارة 5، الدور 3، شقة 10&#10;أو: https://maps.app.goo.gl/..." rows="3" onChange={handleChange} className="w-full rounded-xl p-4 bg-[#121212] text-white border border-[#333] focus:border-[#D4AF37] focus:outline-none resize-none" required />
-                  <p className="text-xs text-gray-500 mt-1">اكتب العنوان كامل أو الصق لينك Google Maps</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm text-gray-400 flex items-center gap-2"><MapPin size={16} />العنوان بالتفصيل *</label>
+                    <button type="button" onClick={handleGetLocation} disabled={locating} className="text-[11px] bg-[#1a1a1a] border border-[#D4AF37]/40 text-[#D4AF37] px-3 py-1.5 rounded-full hover:bg-[#D4AF37]/20 transition flex items-center gap-1.5">
+                      <Navigation size={12} />{locating? 'جاري التحديد...' : 'تحديد موقعي تلقائي'}
+                    </button>
+                  </div>
+                  <textarea name="address" value={form.address} placeholder="مثال: شارع التحرير، عمارة 5، الدور 3&#10;أو اضغط تحديد موقعي تلقائي" rows="4" onChange={handleChange} className="w-full rounded-xl p-4 bg-[#121212] text-white border border-[#333] focus:border-[#D4AF37] focus:outline-none resize-none" required />
+                  <p className="text-xs text-gray-500 mt-1">اختياري: دوس على الزرار اللي فوق على الشمال هيحط لينك موقعك على الخريطة تلقائي</p>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-400 mb-2 flex items-center gap-2"><FileText size={16} />ملاحظات (اختياري)</label>
