@@ -220,21 +220,26 @@ export default function Checkout() {
         }
       }
 
-      // 🔔 الاشعارات - الصح
+      // 🔔 الاشعارات - الصح - غير محجوبة
+      // نظهر النجاح للعميل فورا قبل الاشعارات
+      
+    
+
+      // الاشعارات في الخلفية - مش هنعملها await
       try {
-        // 1- للعميل الزائر: SMS بس
-        await fetch('/api/sendSMS', {
+        // 1- للعميل: SMS - fire and forget
+        fetch('/api/sendSMS', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             phone: form.phone.trim(),
-            message: `سوق فاقوس: تم استلام طلبك #${mainOrder.id} بنجاح - الاجمالي ${total.toFixed(2)}ج - تابع طلبك: souq-faqous.com/track/${mainOrder.id}`
+            message: `سوق فاقوس: تم استلام طلبك #${mainOrder.id} بنجاح - الاجمالي ${total.toFixed(2)}ج`
           })
-        });
+        }).catch(e=>console.log('SMS err',e));
 
-        // 2- للمحلات: OneSignal
-        for (const shop of groupedByShop) {
-          await fetch('/api/sendNotification', {
+        // 2- للمحلات
+        groupedByShop.forEach(shop => {
+          fetch('/api/sendNotification', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -242,36 +247,36 @@ export default function Checkout() {
               title: 'عندك طلب جديد 🔔',
               message: `طلب #${mainOrder.id} بـ ${shop.subtotal.toFixed(2)}ج من ${form.name}`
             })
-          });
-        }
+          }).catch(e=>console.log('Shop notify err',e));
+        });
 
-        // 3- للتوصيل والادمن: OneSignal
-        await fetch('/api/sendNotification', {
+        // 3- للتوصيل والادمن
+        fetch('/api/sendNotification', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             targetRole: 'delivery',
             title: 'طلب جديد للتوصيل 📦',
-            message: `طلب #${mainOrder.id} - ${form.name} - ${form.phone} - ${form.address}`
+            message: `طلب #${mainOrder.id} - ${form.name} - ${form.phone}`
           })
-        });
+        }).catch(()=>{});
 
-        await fetch('/api/sendNotification', {
+        fetch('/api/sendNotification', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             targetRole: 'admin',
             title: 'اوردر جديد 🛒',
-            message: `اوردر #${mainOrder.id} من ${form.name} - ${total.toFixed(2)}ج`
+            message: `اوردر #${mainOrder.id} من ${form.name}`
           })
-        });
+        }).catch(()=>{});
 
       } catch (notifyErr) {
         console.log('Notify error', notifyErr)
       }
-      localStorage.removeItem("cart");
-      window.dispatchEvent(new Event('cartUpdated'));
-      setShowSuccess({ id: mainOrder.id, total: total.toFixed(2), count: totalItems });
+
+      return; // مهم عشان ميكملش للـ finally
+     
     } catch (error) {
       console.error(error);
       alert("حدث خطأ أثناء حفظ الطلب: " + error.message);
