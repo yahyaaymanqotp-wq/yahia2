@@ -220,22 +220,19 @@ export default function Checkout() {
         }
       }
 
-      // 🔔 الاشعارات - للعميل والمحل والتوصيل والادمن
+      // 🔔 الاشعارات - الصح
       try {
-        // 0- للعميل نفسه: تم الاستلام والسعر كذا
-        if (onesignalId) {
-          await fetch('/api/sendNotification', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              playerId: onesignalId,
-              title: 'تم استلام طلبك ✅',
-              message: `طلبك #${mainOrder.id} تم استلامه - الاجمالي ${total.toFixed(2)} جنيه - قيد التجهيز`
-            })
-          });
-        }
+        // 1- للعميل الزائر: SMS بس
+        await fetch('/api/sendSMS', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: form.phone.trim(),
+            message: `سوق فاقوس: تم استلام طلبك #${mainOrder.id} بنجاح - الاجمالي ${total.toFixed(2)}ج - تابع طلبك: souq-faqous.com/track/${mainOrder.id}`
+          })
+        });
 
-        // 1- لصاحب المحل: عندك طلب كذا بس
+        // 2- للمحلات: OneSignal
         for (const shop of groupedByShop) {
           await fetch('/api/sendNotification', {
             method: 'POST',
@@ -243,37 +240,35 @@ export default function Checkout() {
             body: JSON.stringify({
               targetId: shop.shopId.toString(),
               title: 'عندك طلب جديد 🔔',
-              message: `عندك طلب #${mainOrder.id} بـ ${shop.subtotal.toFixed(2)} جنيه`
+              message: `طلب #${mainOrder.id} بـ ${shop.subtotal.toFixed(2)}ج من ${form.name}`
             })
           });
         }
 
-        // 2- للتوصيل: طلب جديد بكل البيانات
+        // 3- للتوصيل والادمن: OneSignal
         await fetch('/api/sendNotification', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             targetRole: 'delivery',
             title: 'طلب جديد للتوصيل 📦',
-            message: `طلب #${mainOrder.id} - العميل: ${form.name} - فون: ${form.phone} - العنوان: ${form.address} - الاجمالي: ${total.toFixed(2)}ج`
+            message: `طلب #${mainOrder.id} - ${form.name} - ${form.phone} - ${form.address}`
           })
         });
 
-        // 3- للادمن: كل حاجة
         await fetch('/api/sendNotification', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             targetRole: 'admin',
             title: 'اوردر جديد 🛒',
-            message: `اوردر #${mainOrder.id} من ${form.name} - ${total.toFixed(2)}ج - ${groupedByShop.length} محل - ${form.phone}`
+            message: `اوردر #${mainOrder.id} من ${form.name} - ${total.toFixed(2)}ج`
           })
         });
 
       } catch (notifyErr) {
         console.log('Notify error', notifyErr)
       }
-
       localStorage.removeItem("cart");
       window.dispatchEvent(new Event('cartUpdated'));
       setShowSuccess({ id: mainOrder.id, total: total.toFixed(2), count: totalItems });
