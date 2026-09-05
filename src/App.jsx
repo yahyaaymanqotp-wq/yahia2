@@ -1,4 +1,4 @@
-
+import InstallButton from "./components/InstallButton";
 import Cart from './pages/Cart.jsx'
 import Checkout from './pages/Checkout.jsx'
 import { BrowserRouter, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
@@ -365,6 +365,7 @@ function BottomNav({ userRole }) {
       <NavItem to="/" icon={HomeIcon} label="الرئيسية" />
       <NavItem to="/complaints" icon={MessageCircle} label="الشكاوى" />
       <NavItem to="/track-order" icon={Package} label="تتبع الطلب" />
+      <InstallButton />
     </div>
   )
 }
