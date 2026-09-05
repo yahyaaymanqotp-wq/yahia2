@@ -2,13 +2,42 @@
 <html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>سوق فاقوس</title>
+
+    <!-- Favicon - اللوجو -->
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon.png" />
+    <link rel="shortcut icon" href="/favicon.png" />
+
+    <!-- SEO -->
+    <title>سوق فاقوس | أول سوق إلكتروني يجمع محلات فاقوس</title>
+    <meta name="description" content="سوق فاقوس هو أول منصة إلكترونية تجمع كل محلات فاقوس في مكان واحد - ملابس، موبايلات، مطاعم، وخدمات. تصفح المنتجات وتواصل مباشرة مع صاحب المحل." />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <link rel="canonical" href="https://souq-faqous.com/" />
+    <meta name="theme-color" content="#111827" />
+    <meta name="author" content="سوق فاقوس" />
+
+    <!-- Open Graph - اللي بيخلي شكلك فخم في جوجل وواتساب وفيسبوك -->
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="ar_EG" />
+    <meta property="og:site_name" content="سوق فاقوس" />
+    <meta property="og:url" content="https://souq-faqous.com/" />
+    <meta property="og:title" content="سوق فاقوس | أول سوق إلكتروني يجمع محلات فاقوس" />
+    <meta property="og:description" content="كل محلات وأنشطة فاقوس في مكان واحد. تصفح المحلات والمنتجات وتواصل بسهولة." />
+    <meta property="og:image" content="https://souq-faqous.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="سوق فاقوس | أول سوق إلكتروني يجمع محلات فاقوس" />
+    <meta name="twitter:description" content="كل محلات فاقوس في مكان واحد." />
+    <meta name="twitter:image" content="https://souq-faqous.com/og-image.png" />
+
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+
     <!-- OneSignal -->
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
     <script>
@@ -17,11 +46,36 @@
         await OneSignal.init({
           appId: "bfab6c71-028a-40bb-bcb3-8457499dafb2",
           safari_web_id: "web.onesignal.auto.27d2eba6-7621-43e8-b8d4-d2a9de3b8fea",
-          notifyButton: {
-            enable: true,
-          },
+          notifyButton: { enable: true },
         });
       });
+    </script>
+
+    <!-- Schema.org - ده اللي هيخلي جوجل يطلع اللوجو واسم الموقع بشكل رسمي -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "سوق فاقوس",
+      "url": "https://souq-faqous.com/",
+      "logo": "https://souq-faqous.com/favicon.png",
+      "image": "https://souq-faqous.com/og-image.png"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "سوق فاقوس",
+      "alternateName": "Souq Faqous",
+      "url": "https://souq-faqous.com/",
+      "inLanguage": "ar",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://souq-faqous.com/search?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
     </script>
   </head>
   <body>
