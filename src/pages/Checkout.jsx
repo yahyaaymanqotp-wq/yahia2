@@ -25,8 +25,8 @@ export default function Checkout() {
   async function loadShops() {
     try {
       const { data, error } = await supabase
- .from("shops")
- .select("id, name, delivery_fee, min_order");
+.from("shops")
+.select("id, name, delivery_fee, min_order");
       if (error) return;
       const map = {};
       data?.forEach(shop => {
@@ -126,8 +126,8 @@ export default function Checkout() {
     setSubmitting(true);
     try {
       const { data: mainOrder, error: mainError } = await supabase
- .from("orders")
- .insert({
+.from("orders")
+.insert({
           shop_id: null,
           customer_name: form.name.trim(),
           customer_phone: form.phone.trim(),
@@ -139,8 +139,8 @@ export default function Checkout() {
           delivery_status: "pending",
           payment_status: "pending",
         })
- .select()
- .single();
+.select()
+.single();
       if (mainError) throw mainError;
 
       const mainOrderItems = cart.map(item => ({
@@ -160,8 +160,8 @@ export default function Checkout() {
         const shopDeliveryFee = parseFloat(shop.shopData?.delivery_fee || 0)
         const shopTotal = shop.subtotal + shopDeliveryFee
         const { data: orderData, error: orderError } = await supabase
-   .from("orders")
-   .insert({
+  .from("orders")
+  .insert({
             shop_id: shop.shopId,
             parent_order_id: mainOrder.id,
             customer_name: form.name.trim(),
@@ -174,8 +174,8 @@ export default function Checkout() {
             delivery_status: "pending",
             payment_status: "pending",
           })
-   .select()
-   .single();
+  .select()
+  .single();
         if (orderError) throw orderError;
         const orderItems = shop.items.map(item => ({
           order_id: orderData.id,
@@ -204,6 +204,42 @@ export default function Checkout() {
       window.dispatchEvent(new Event('cartUpdated'));
       setShowSuccess({ id: mainOrder.id, total: total.toFixed(2), count: totalItems });
       setSubmitting(false);
+
+      // 🤖 إرسال الطلب المجمع إلى تيليجرام
+      try {
+        const { error: telegramError } = await supabase.functions.invoke(
+          "telegram-notification",
+          {
+            body: {
+              order: {
+                id: mainOrder.id,
+                customer_name: form.name.trim(),
+                customer_phone: form.phone.trim(),
+                customer_address: form.address.trim(),
+                notes: form.notes.trim(),
+                subtotal: subtotal,
+                total: total
+              },
+
+              items: mainOrderItems,
+
+              shops: Object.fromEntries(
+                groupedByShop.map(shop => [
+                  shop.shopId.toString(),
+                  shop.shopName
+                ])
+              )
+            }
+          }
+        );
+
+        if (telegramError) {
+          console.error("Telegram Error:", telegramError);
+        }
+
+      } catch (telegramError) {
+        console.error("Telegram Error:", telegramError);
+      }
 
       // 🔔 الاشعارات - الصح: العميل SMS بس، المحل والتوصيل OneSignal
       try {
