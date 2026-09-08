@@ -3,15 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.ico?v=5" sizes="any">
+    <link rel="icon" type="image/png" href="/favicon.png?v=5" sizes="192x192">
+    <link rel="icon" href="/favicon.ico?v=5" sizes="any">
+<link rel="icon" type="image/png" href="/favicon.png?v=5" sizes="192x192">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=5" sizes="180x180">
+<link rel="manifest" href="/manifest.json?v=5" />
+    <link rel="manifest" href="/manifest.json?v=5" />
 
-    <!-- Favicon - اللوجو -->
-     <link rel="manifest" href="/manifest.json" />
-<link rel="apple-touch-icon" href="/favicon.png" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/favicon.png" />
-    <link rel="shortcut icon" href="/favicon.png" />
-
-    <!-- SEO -->
     <title>سوق فاقوس | أول سوق إلكتروني يجمع محلات فاقوس</title>
     <meta name="description" content="سوق فاقوس هو أول منصة إلكترونية تجمع كل محلات فاقوس في مكان واحد - ملابس، موبايلات، مطاعم، وخدمات. تصفح المنتجات وتواصل مباشرة مع صاحب المحل." />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
@@ -19,7 +18,6 @@
     <meta name="theme-color" content="#111827" />
     <meta name="author" content="سوق فاقوس" />
 
-    <!-- Open Graph - اللي بيخلي شكلك فخم في جوجل وواتساب وفيسبوك -->
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="ar_EG" />
     <meta property="og:site_name" content="سوق فاقوس" />
@@ -35,25 +33,24 @@
     <meta name="twitter:description" content="كل محلات فاقوس في مكان واحد." />
     <meta name="twitter:image" content="https://souq-faqous.com/og-image.png" />
 
-    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
 
-    <!-- OneSignal -->
+    <!-- OneSignal - متصلح -->
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
     <script>
       window.OneSignalDeferred = window.OneSignalDeferred || [];
       OneSignalDeferred.push(async function(OneSignal) {
         await OneSignal.init({
           appId: "bfab6c71-028a-40bb-bcb3-8457499dafb2",
-          safari_web_id: "web.onesignal.auto.27d2eba6-7621-43e8-b8d4-d2a9de3b8fea",
-          notifyButton: { enable: true },
+          allowLocalhostAsSecureOrigin: true,
+          serviceWorkerParam: { scope: "/" },
+          serviceWorkerPath: "/OneSignalSDKWorker.js"
         });
       });
     </script>
 
-    <!-- Schema.org - ده اللي هيخلي جوجل يطلع اللوجو واسم الموقع بشكل رسمي -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -79,8 +76,8 @@
       }
     }
     </script>
-    <script type="module" crossorigin src="/assets/index-CVXFNf4J.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-Bshbqk80.css">
+    <script type="module" crossorigin src="/assets/index-DYNaKeov.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BbFfemwi.css">
   <link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
   <body>
     <div id="root"></div>
