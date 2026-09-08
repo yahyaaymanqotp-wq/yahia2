@@ -1,8 +1,8 @@
 {
-  "name": "سوق فاقوس",
+  "name": "سوق فاقوس الرسمي - souq-faqous.com",
   "short_name": "سوق فاقوس",
-  "description": "أول سوق إلكتروني يجمع محلات فاقوس",
-  "icons": [
+  "description": "أول سوق إلكتروني رسمى يجمع محلات فاقوس في مكان واحد",
+  "icons": [ 
     {
       "src": "/favicon.png",
       "sizes": "192x192",
