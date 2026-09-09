@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { ShoppingCart, MapPin, Phone, ArrowRight, DollarSign, Package, ArrowLeft } from 'lucide-react'
+import { ShoppingCart, MapPin, Phone, ArrowRight, Package, Crown, Sparkles, Star, ShieldCheck, Gem } from 'lucide-react'
 
 export default function ShopPage() {
   const { id } = useParams()
@@ -75,6 +75,17 @@ export default function ShopPage() {
     alert('تم إضافة المنتج للسلة ✅')
   }
 
+  // ✅ حساب نسبة الخصم
+  function getDiscountPercent(product) {
+    if (product.discount_percent && product.discount_percent > 0) return product.discount_percent
+    if (product.old_price && parseFloat(product.old_price) > parseFloat(product.price)) {
+      const oldP = parseFloat(product.old_price)
+      const newP = parseFloat(product.price)
+      return Math.round(((oldP - newP) / oldP) * 100)
+    }
+    return 0
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#121212] flex items-center justify-center">
@@ -94,6 +105,104 @@ export default function ShopPage() {
             <ArrowRight size={20} />
             العودة للرئيسية
           </Link>
+        </div>
+      </div>
+    )
+  }
+
+  // ✅🔥 متاجر سوق فاقوس الرسمية فقط - تصميم ULTRA LUXURY
+  if (shop.is_souq_faqous_shop) {
+    return (
+      <div className="min-h-screen bg-[#050505] text-white pb-20 relative overflow-hidden" dir="rtl">
+        <div className="fixed inset-0 pointer-events-none">
+          <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-[#D4AF37]/[0.08] rounded-full blur-[150px] -translate-y-1/2 translate-x-1/3"></div>
+          <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-[#D4AF37]/[0.05] rounded-full blur-[120px] translate-y-1/3 -translate-x-1/4"></div>
+        </div>
+
+        <div className="relative bg-black/50 backdrop-blur-2xl border-b border-[#D4AF37]/10 sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+            <Link to="/" className="inline-flex items-center gap-2 text-white/50 hover:text-[#D4AF37] transition text-sm group">
+              <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center group-hover:border-[#D4AF37]/30 transition"><ArrowRight size={16} /></div>
+              العودة
+            </Link>
+            <div className="flex items-center gap-2">
+              <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/20 text-[11px] text-[#D4AF37]"><ShieldCheck size={12} /> متجر موثق من الإدارة</div>
+              <div className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-[#D4AF37] via-[#FFD700] to-[#D4AF37] text-black text-[11px] font-black tracking-widest shadow-[0_0_20px_rgba(212,175,55,0.5)]"><Crown size={14} className="fill-black" /> OFFICIAL STORE <Sparkles size={12} /></div>
+            </div>
+          </div>
+        </div>
+
+        <div className="relative h-[380px] md:h-[520px] overflow-hidden">
+          <img src={shop.cover_image_url || shop.logo_url} className="w-full h-full object-cover scale-105" alt="" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/85 to-[#050505]/30"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-[#D4AF37]/20 via-transparent to-transparent"></div>
+
+          <div className="absolute inset-0 flex items-end p-4 md:p-10">
+            <div className="max-w-7xl mx-auto w-full flex flex-col md:flex-row items-start md:items-end gap-6">
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-[#D4AF37] to-[#FFD700] blur-2xl opacity-30 rounded-[2.5rem]"></div>
+                <div className="relative w-32 h-32 md:w-48 md:h-48 rounded-[2.5rem] p-[3px] bg-gradient-to-br from-[#D4AF37] via-[#FFD700] to-[#D4AF37] shadow-[0_0_50px_rgba(212,175,55,0.4)]">
+                  <div className="w-full h-full rounded-[2.3rem] overflow-hidden bg-black p-1">
+                    <img src={shop.logo_url} className="w-full h-full object-cover rounded-[2rem]" alt={shop.name} />
+                  </div>
+                </div>
+                <div className="absolute -top-3 -right-3 w-12 h-12 rounded-full bg-gradient-to-br from-[#FFD700] to-[#D4AF37] border-4 border-[#050505] flex items-center justify-center shadow-xl"><Crown size={20} className="text-black fill-black" /></div>
+              </div>
+              <div className="flex-1 pb-2">
+                <h1 className="text-4xl md:text-6xl font-black tracking-tight flex items-center gap-4">{shop.name}<Gem size={28} className="text-[#D4AF37] hidden md:block" /></h1>
+                <p className="text-[#D4AF37]/80 mt-3 flex items-center gap-2 text-sm font-medium"><span className="w-8 h-[1px] bg-[#D4AF37]/50"></span> متجر خاص تابع لإدارة سوق فاقوس مباشرة <Star size={14} className="fill-[#D4AF37] text-[#D4AF37]" /> {shop.categories?.name}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="relative max-w-7xl mx-auto px-4 mt-10">
+          <div className="rounded-[2.5rem] p-[1px] bg-gradient-to-br from-[#D4AF37]/40 via-[#D4AF37]/10 to-transparent mb-12">
+            <div className="rounded-[2.5rem] bg-gradient-to-br from-[#101010]/90 to-[#080808]/90 backdrop-blur-xl p-8 border border-white/[0.03]">
+              <div className="flex items-start gap-4"><div className="w-10 h-10 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/20 flex items-center justify-center flex-shrink-0"><Sparkles size={18} className="text-[#D4AF37]" /></div><p className="text-white/60 leading-8 text-[15px]">{shop.description || 'متجر رسمي معتمد من إدارة سوق فاقوس الإلكتروني'}</p></div>
+              <div className="flex flex-wrap gap-3 mt-8">{shop.address && <div className="flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-[#D4AF37]/[0.06] border border-[#D4AF37]/15 text-sm"><MapPin size={16} className="text-[#D4AF37]" />{shop.address}</div>}{shop.phone && <div className="flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-white/[0.03] border border-white/10 text-sm" dir="ltr"><Phone size={16} className="text-white/40" />{shop.phone}</div>}</div>
+            </div>
+          </div>
+
+          <div className="flex items-end justify-between mb-8">
+            <h2 className="text-4xl font-black">منتجاتنا <span className="text-[#D4AF37]">الخاصة</span></h2>
+            <div className="px-4 py-2 rounded-full bg-white/[0.03] border border-white/10 text-sm text-white/40">{products.length} منتج حصري</div>
+          </div>
+
+          {products.length === 0? (
+            <div className="text-center py-24 rounded-[2.5rem] bg-[#0a0a0a] border border-[#D4AF37]/10"><Package size={60} className="text-[#D4AF37]/20 mx-auto mb-4" /><p className="text-white/30">لا يوجد منتجات حالياً</p></div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {products.map((product) => {
+                const discountPercent = getDiscountPercent(product)
+                const hasDiscount = discountPercent > 0
+                return (
+                  <div key={product.id} className="group relative rounded-[2rem] p-[1px] bg-gradient-to-br from-white/10 via-white/[0.02] to-transparent hover:from-[#D4AF37]/50 hover:via-[#D4AF37]/10 hover:to-transparent transition-all duration-700 hover:-translate-y-2">
+                    <div className="relative bg-gradient-to-br from-[#141414] to-[#0a0a0a] rounded-[2rem] overflow-hidden flex flex-col h-full">
+                      <div className="relative aspect-square bg-[#080808] overflow-hidden">
+                        <img src={product.image_url} alt={product.name} className="w-full h-full object-contain p-4 group-hover:scale-110 transition-transform duration-1000" loading="lazy" />
+                        {hasDiscount && (
+                          <div className="absolute top-4 right-4 px-3 py-2 rounded-full bg-gradient-to-r from-red-600 to-red-500 text-white text-[11px] font-black shadow-xl">
+                            عرض خاص {discountPercent}% خصم
+                          </div>
+                        )}
+                        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[#141414] to-transparent"></div>
+                      </div>
+                      <div className="p-6 flex flex-col flex-1">
+                        <h3 className="font-bold text-[17px] group-hover:text-[#D4AF37] transition-colors">{product.name}</h3>
+                        <p className="text-white/30 text-xs mt-2 line-clamp-2 h-8 leading-relaxed">{product.description || 'منتج حصري من متاجر سوق فاقوس الرسمية'}</p>
+                        <div className="flex items-end justify-between mt-6 mb-5">
+                          <div><div className="text-white/20 text-[11px] tracking-widest">السعر</div><div className="flex items-baseline gap-2"><div className="flex items-baseline gap-1 text-[#D4AF37] font-black text-2xl">{product.price}<span className="text-xs font-bold">ج.م</span></div>{product.old_price && <span className="text-white/20 line-through text-xs">{product.old_price} ج.م</span>}</div></div>
+                          <div className="text-[11px] px-2.5 py-1 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/20 text-[#D4AF37]">{product.stock} متاح</div>
+                        </div>
+                        <button onClick={() => addToCart(product)} disabled={product.stock === 0} className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#D4AF37] to-[#FFD700] text-black font-black tracking-wide hover:shadow-[0_0_30px_rgba(212,175,55,0.6)] transition-all flex items-center justify-center gap-2 disabled:opacity-20"><ShoppingCart size={18} />إضافة للسلة</button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
     )
@@ -164,89 +273,32 @@ export default function ShopPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {products.map((product) => {
-              const hasImage =!!product.image_url;
-              const hasDiscount = product.discount_percent > 0 || (product.old_price && parseFloat(product.old_price) > parseFloat(product.price));
-              const discountLabel = product.discount_percent? `${product.discount_percent}% خصم` : product.old_price? `خصم ${(parseFloat(product.old_price) - parseFloat(product.price)).toFixed(0)} ج.م` : null;
-
+              const discountPercent = getDiscountPercent(product)
+              const hasDiscount = discountPercent > 0
               return (
                 <div
                   key={product.id}
                   className="bg-[#1E1E1E] border border-[#333] rounded-3xl overflow-hidden hover:border-[#D4AF37]/30 transition-all hover:scale-[1.02] flex flex-col"
                 >
-                  {hasImage && (
-                    <div className="relative w-full aspect-square overflow-hidden bg-black flex items-center justify-center">
-                      <img
-                        src={product.image_url}
-                        alt={product.name}
-                        className="w-full h-full object-contain"
-                        loading="lazy"
-                      />
-                      {hasDiscount && (
-                        <span className="absolute top-3 right-3 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full">
-                          {discountLabel}
-                        </span>
-                      )}
-                      {product.stock === 0 && (
-                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                          <span className="bg-red-600 text-white px-4 py-2 rounded-lg font-bold">
-                            نفذت الكمية
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
+                  <div className="relative w-full aspect-square overflow-hidden bg-black flex items-center justify-center">
+                    <img src={product.image_url} alt={product.name} className="w-full h-full object-contain" loading="lazy" />
+                    {hasDiscount && (
+                      <span className="absolute top-3 right-3 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+                        عرض خاص {discountPercent}% خصم
+                      </span>
+                    )}
+                  </div>
                   <div className="p-5 flex flex-col flex-1">
-                    <h3 className="text-lg font-bold text-white mb-1 line-clamp-1">
-                      {product.name}
-                    </h3>
-
-                    {!hasImage && product.description && (
-                      <p className="text-white/50 text-sm mb-3 line-clamp-2">
-                        {product.description}
-                      </p>
-                    )}
-                    {hasImage && (
-                      <p className="text-white/50 text-sm mb-4 line-clamp-2 h-10">
-                        {product.description || 'لا يوجد وصف'}
-                      </p>
-                    )}
-
+                    <h3 className="text-lg font-bold text-white mb-1 line-clamp-1">{product.name}</h3>
+                    <p className="text-white/50 text-sm mb-4 line-clamp-2 h-10">{product.description || 'لا يوجد وصف'}</p>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1 text-[#D4AF37] font-bold text-2xl">
-                          <span>{product.price}</span>
-                          <span className="text-sm">ج.م</span>
-                        </div>
-                        {product.old_price && parseFloat(product.old_price) > parseFloat(product.price) && (
-                          <span className="text-white/30 line-through text-sm">{product.old_price} ج.م</span>
-                        )}
+                        <div className="flex items-center gap-1 text-[#D4AF37] font-bold text-2xl"><span>{product.price}</span><span className="text-sm">ج.م</span></div>
+                        {product.old_price && <span className="text-white/30 line-through text-sm">{product.old_price} ج.م</span>}
                       </div>
-                      <div className="text-white/40 text-sm">
-                        {product.stock} متاح
-                      </div>
+                      <div className="text-white/40 text-sm">{product.stock} متاح</div>
                     </div>
-
-                    {!hasImage && hasDiscount && (
-                      <div className="mb-3">
-                        <span className="bg-red-500/20 text-red-400 text-xs font-bold px-3 py-1 rounded-full">
-                          {discountLabel}
-                        </span>
-                      </div>
-                    )}
-
-                    {hasImage && product.stock === 0? null :!hasImage && product.stock === 0? (
-                      <div className="w-full px-4 py-3 rounded-xl bg-red-500/20 text-red-400 font-bold text-center">نفذت الكمية</div>
-                    ) : null}
-
-                    <button
-                      onClick={() => addToCart(product)}
-                      disabled={product.stock === 0}
-                      className="w-full mt-auto px-4 py-3 rounded-xl bg-[#D4AF37] text-black font-bold hover:bg-[#D4AF37]/90 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <ShoppingCart size={18} />
-                      أضف للسلة
-                    </button>
+                    <button onClick={() => addToCart(product)} disabled={product.stock === 0} className="w-full mt-auto px-4 py-3 rounded-xl bg-[#D4AF37] text-black font-bold hover:bg-[#D4AF37]/90 transition flex items-center justify-center gap-2"><ShoppingCart size={18} />أضف للسلة</button>
                   </div>
                 </div>
               );

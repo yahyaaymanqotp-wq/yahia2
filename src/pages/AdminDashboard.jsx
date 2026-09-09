@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { Store, Truck, Package, Upload, LogOut, Plus, X, Edit, Trash2, DollarSign, TrendingUp, BarChart3 } from 'lucide-react'
+import { Store, Truck, Package, Upload, LogOut, Plus, X, Edit, Trash2, DollarSign, TrendingUp, BarChart3, Crown, Sparkles } from 'lucide-react'
 
 export default function AdminDashboard() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -29,7 +29,8 @@ export default function AdminDashboard() {
     logo_url: '',
     cover_image_url: '',
     username: '',
-    password: ''
+    password: '',
+    is_souq_faqous_shop: false
   })
   const [companyForm, setCompanyForm] = useState({
     name: '',
@@ -204,14 +205,14 @@ export default function AdminDashboard() {
 
     // اسم الملف WebP
     const fileName = `${Date.now()}-${Math.random()
-     .toString(36)
-     .substring(7)}.webp`
+    .toString(36)
+    .substring(7)}.webp`
 
     const filePath = `shops/${fileName}`
 
     const { error: uploadError } = await supabase.storage
-     .from('shop-images')
-     .upload(filePath, compressedFile, {
+    .from('shop-images')
+    .upload(filePath, compressedFile, {
         contentType: 'image/webp',
         upsert: false
       })
@@ -221,11 +222,11 @@ export default function AdminDashboard() {
     const {
       data: { publicUrl }
     } = supabase.storage
-     .from('shop-images')
-     .getPublicUrl(filePath)
+    .from('shop-images')
+    .getPublicUrl(filePath)
 
     setShopForm(prev => ({
-     ...prev,
+    ...prev,
       logo_url: publicUrl
     }))
 
@@ -350,7 +351,8 @@ function handleEditShop(shop) {
     logo_url: shop.logo_url || '',
     cover_image_url: shop.cover_image_url || '',
     username: shop.username || '',
-    password: shop.password || ''
+    password: shop.password || '',
+    is_souq_faqous_shop: shop.is_souq_faqous_shop || false
   })
 
   setShowAddShop(true)
@@ -366,7 +368,8 @@ function resetShopForm() {
     logo_url: '',
     cover_image_url: '',
     username: '',
-    password: ''
+    password: '',
+    is_souq_faqous_shop: false
   })
 
   setEditingShop(null)
@@ -377,10 +380,10 @@ async function handleAddShop(e) {
   e.preventDefault()
 
   if (
-   !shopForm.name.trim() ||
-   !shopForm.category_id ||
-   !shopForm.username.trim() ||
-   !shopForm.password.trim()
+  !shopForm.name.trim() ||
+  !shopForm.category_id ||
+  !shopForm.username.trim() ||
+  !shopForm.password.trim()
   ) {
     alert('املأ الحقول المطلوبة: الاسم، القسم، اليوزرنيم، الباسورد')
     return
@@ -404,16 +407,17 @@ async function handleAddShop(e) {
       logo_url: shopForm.logo_url || null,
       cover_image_url: shopForm.cover_image_url || null,
       username: shopForm.username.trim(),
-      password: shopForm.password
+      password: shopForm.password,
+      is_souq_faqous_shop: shopForm.is_souq_faqous_shop
     }
 
     // ✏️ تعديل محل موجود
     if (editingShop) {
 
       const { error } = await supabase
-       .from('shops')
-       .update(shopData)
-       .eq('id', editingShop.id)
+      .from('shops')
+      .update(shopData)
+      .eq('id', editingShop.id)
 
       if (error) {
         if (error.code === '23505') {
@@ -431,9 +435,9 @@ async function handleAddShop(e) {
     else {
 
       const { error } = await supabase
-       .from('shops')
-       .insert({
-         ...shopData,
+      .from('shops')
+      .insert({
+        ...shopData,
           is_active: true,
           is_verified: true,
           rating: 5.0
@@ -675,7 +679,8 @@ async function handleAddShop(e) {
                     logo_url: '',
                     cover_image_url: '',
                     username: '',
-                    password: ''
+                    password: '',
+                    is_souq_faqous_shop: false
                   })
                   setShowAddShop(true)
                 }}
@@ -694,7 +699,14 @@ async function handleAddShop(e) {
                       <img src={shop.logo_url} className="w-10 h-10 md:w-12 md:h-12 rounded-lg object-cover flex-shrink-0" alt="" />
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold truncate">{shop.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-bold truncate">{shop.name}</p>
+                        {shop.is_souq_faqous_shop && (
+                          <span className="flex items-center gap-1 bg-[#D4AF37] text-black px-2 py-0.5 rounded-full text-[10px] font-bold">
+                            <Crown size={10} /> رسمي
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs md:text-sm text-gray-400">{shop.categories?.name}</p>
                       <p className="text-xs text-gray-500 truncate">@{shop.username}</p>
                     </div>
@@ -703,7 +715,7 @@ async function handleAddShop(e) {
                         onClick={() => toggleShopStatus(shop.id, shop.is_active)}
                         className={`px-2 md:px-3 py-1 rounded-lg text-xs md:text-sm font-bold ${
                           shop.is_active
-                           ? 'bg-green-500/20 text-green-400'
+                          ? 'bg-green-500/20 text-green-400'
                             : 'bg-red-500/20 text-red-400'
                         }`}
                       >
@@ -764,7 +776,7 @@ async function handleAddShop(e) {
                         onClick={() => toggleCompanyStatus(company.id, company.is_active)}
                         className={`px-3 py-1 rounded-lg text-xs font-bold ${
                           company.is_active
-                 ? 'bg-green-500/20 text-green-400'
+                ? 'bg-green-500/20 text-green-400'
                             : 'bg-red-500/20 text-red-400'
                         }`}
                       >
@@ -838,6 +850,26 @@ async function handleAddShop(e) {
                 <input type="text" placeholder="العنوان" value={shopForm.address} onChange={(e) => setShopForm({...shopForm, address: e.target.value})} className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3" />
                 <input type="tel" placeholder="رقم الهاتف" value={shopForm.phone} onChange={(e) => setShopForm({...shopForm, phone: e.target.value})} className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3" />
                 <div><label className="block text-sm text-gray-400 mb-2">لوجو المحل</label><div className="flex items-center gap-4">{shopForm.logo_url && (<img src={shopForm.logo_url} className="w-16 h-16 md:w-20 md:h-20 rounded-lg object-cover" alt="" />)}<label className="flex-1 cursor-pointer"><div className="bg-[#121212] border border-[#333] border-dashed rounded-xl px-4 py-3 text-center hover:border-[#D4AF37] transition">{uploadingLogo? (<span className="text-[#D4AF37]">جاري الرفع...</span>) : (<span className="flex items-center justify-center gap-2 text-sm md:text-base"><Upload size={18} />اختر صورة</span>)}</div><input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" disabled={uploadingLogo} /></label></div></div>
+
+                <div className="flex items-center gap-3 bg-gradient-to-br from-[#2a2414] to-[#121212] border border-[#D4AF37]/30 rounded-xl p-4">
+                  <input
+                    type="checkbox"
+                    id="is_souq_faqous_shop"
+                    checked={shopForm.is_souq_faqous_shop}
+                    onChange={(e) => setShopForm({...shopForm, is_souq_faqous_shop: e.target.checked})}
+                    className="w-5 h-5 accent-[#D4AF37] rounded"
+                  />
+                  <label htmlFor="is_souq_faqous_shop" className="flex items-center gap-2 text-white cursor-pointer flex-1">
+                    <div className="w-8 h-8 rounded-lg bg-[#D4AF37] text-black flex items-center justify-center">
+                      <Crown size={16} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 font-bold">متجر رسمي تابع لسوق فاقوس <Sparkles size={14} className="text-[#D4AF37]" /></div>
+                      <p className="text-xs text-white/50">هيظهر في القسم الذهبي المميز في الصفحة الرئيسية</p>
+                    </div>
+                  </label>
+                </div>
+
                 <div className="border-t border-[#333] pt-4"><p className="text-sm text-gray-400 mb-3">بيانات الدخول للمحل</p><input type="text" placeholder="اسم المستخدم *" value={shopForm.username} onChange={(e) => setShopForm({...shopForm, username: e.target.value})} className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3 mb-3" required /><input type="password" placeholder="كلمة المرور * (6 حروف على الأقل)" value={shopForm.password} onChange={(e) => setShopForm({...shopForm, password: e.target.value})} className="w-full bg-[#121212] border border-[#333] rounded-xl px-4 py-3" required minLength={6} /></div>
                 <div className="flex gap-3 pt-4">
                   <button
@@ -846,9 +878,9 @@ async function handleAddShop(e) {
                     className="flex-1 bg-[#D4AF37] text-black py-3 rounded-xl font-bold hover:bg-[#D4AF37]/90 disabled:opacity-50"
                   >
                     {submitting
-                     ? 'جاري الحفظ...'
+                    ? 'جاري الحفظ...'
                       : editingShop
-                       ? 'حفظ التعديلات'
+                      ? 'حفظ التعديلات'
                         : 'إضافة المحل'}
                   </button>
                   <button

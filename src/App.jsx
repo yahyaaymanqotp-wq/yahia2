@@ -210,33 +210,7 @@ function Navbar({ session, userRole, adminName, shopName, companyName, handleLog
           </div>
         </div>
 
-        <div className="pb-4">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="ابحث عن منتجات، محلات أو عروض..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={handleSearch}
-              className="w-full bg-[#1E1E1E] border border-[#333] rounded-xl py-3 px-4 pr-12 text-sm focus:outline-none focus:border-[#D4AF37] placeholder:text-gray-500"
-            />
-            <Search className="absolute right-4 top-3.5 text-gray-500" size={20} />
-          </div>
-
-          {categories.length > 0 && (
-            <div className="flex gap-2 mt-3 overflow-x-auto scrollbar-hide">
-              {categories.slice(0, 6).map(cat => (
-                <button
-                  key={cat.id}
-                  onClick={() => navigate(`/?category=${cat.slug}`)}
-                  className="px-3 py-1.5 bg-[#1E1E1E] border border-[#333] rounded-lg text-xs text-gray-400 hover:border-[#D4AF37] hover:text-[#D4AF37] transition whitespace-nowrap"
-                >
-                  {cat.icon} {cat.name}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* تم حذف البحث والأقسام من هنا */}
 
         {mobileMenuOpen && (
           <div className="py-4 space-y-2 border-t border-[#333] animate-in slide-in-from-top duration-300">
