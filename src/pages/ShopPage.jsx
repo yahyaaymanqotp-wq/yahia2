@@ -203,7 +203,7 @@ export default function ShopPage() {
                         <span className="text-[11px] text-white/50">ج.م</span>
                         {product.old_price && <span className="text-white/30 line-through text-[10px] mr-1">{product.old_price}</span>}
                       </div>
-                      <button onClick={() => addToCart(product)} disabled={product.stock === 0} className="w-full mt-3 h-8 rounded-full bg-[#FFD814] hover:bg-[#F7CA00] text-black font-bold text-[12px] transition flex items-center justify-center gap-1 disabled:opacity-20"><ShoppingCart size={12} />أضف</button>
+                      <button onClick={() => addToCart(product)} disabled={product.stock === 0} className="w-full mt-3 h-8 rounded-full bg-[#FFD814] hover:bg-[#F7CA00] text-black font-bold text-[12px] transition flex items-center justify-center gap-1 disabled:opacity-20"><ShoppingCart size={12} />أضف للسلة</button>
                     </div>
                   </div>
                 )
@@ -311,7 +311,7 @@ export default function ShopPage() {
                       <span className="text-[11px]">ج.م</span>
                       {product.old_price && <span className="text-white/30 line-through text-[10px] mr-1">{product.old_price}</span>}
                     </div>
-                    <button onClick={() => addToCart(product)} disabled={product.stock === 0} className="w-full mt-3 h-8 rounded-full bg-[#D4AF37] text-black font-bold text-[12px] hover:bg-[#D4AF37]/90 transition flex items-center justify-center gap-1"><ShoppingCart size={12} />أضف</button>
+                    <button onClick={() => addToCart(product)} disabled={product.stock === 0} className="w-full mt-3 h-8 rounded-full bg-[#D4AF37] text-black font-bold text-[12px] hover:bg-[#D4AF37]/90 transition flex items-center justify-center gap-1"><ShoppingCart size={12} /> أضف للسلة</button>
                   </div>
                 </div>
               );
