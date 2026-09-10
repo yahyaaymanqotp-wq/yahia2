@@ -20,11 +20,11 @@ export default function ShopPage() {
       setError(null)
 
       const { data: shopData, error: shopError } = await supabase
-       .from('shops')
-       .select('*, categories(name, icon)')
-       .eq('id', id)
-       .eq('is_active', true)
-       .single()
+      .from('shops')
+      .select('*, categories(name, icon)')
+      .eq('id', id)
+      .eq('is_active', true)
+      .single()
 
       if (shopError) throw new Error('المحل غير موجود')
       if (!shopData) throw new Error('المحل غير موجود')
@@ -32,11 +32,11 @@ export default function ShopPage() {
       setShop(shopData)
 
       const { data: productsData, error: productsError } = await supabase
-       .from('products')
-       .select('*')
-       .eq('shop_id', id)
-       .eq('is_active', true)
-       .order('created_at', { ascending: false })
+      .from('products')
+      .select('*')
+      .eq('shop_id', id)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
 
       if (productsError) throw productsError
 
@@ -170,43 +170,40 @@ export default function ShopPage() {
           {products.length === 0? (
             <div className="text-center py-24 rounded-[2.5rem] bg-[#0a0a0a] border border-[#D4AF37]/10"><Package size={60} className="text-[#D4AF37]/20 mx-auto mb-4" /><p className="text-white/30">لا يوجد منتجات حالياً</p></div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            /* ✅ تعديل امازون - كروت صغيرة فقط */
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-3">
               {products.map((product) => {
                 const discountPercent = getDiscountPercent(product)
                 const hasDiscount = discountPercent > 0
                 const hasImage =!!product.image_url
                 return (
-                  <div key={product.id} className="group relative rounded-[2rem] p-[1px] bg-gradient-to-br from-white/10 via-white/[0.02] to-transparent hover:from-[#D4AF37]/50 hover:via-[#D4AF37]/10 hover:to-transparent transition-all duration-700 hover:-translate-y-2">
-                    <div className="relative bg-gradient-to-br from-[#141414] to-[#0a0a0a] rounded-[2rem] overflow-hidden flex flex-col h-full">
-
-                      {hasImage && (
-                        <div className="relative aspect-square bg-[#080808] overflow-hidden">
-                          <img src={product.image_url} alt={product.name} className="w-full h-full object-contain p-4 group-hover:scale-110 transition-transform duration-1000" loading="lazy" />
-                          {hasDiscount && (
-                            <div className="absolute top-4 right-4 px-3 py-2 rounded-full bg-gradient-to-r from-red-600 to-red-500 text-white text-[11px] font-black shadow-xl">
-                              عرض خاص {discountPercent}% خصم
-                            </div>
-                          )}
-                          <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[#141414] to-transparent"></div>
-                        </div>
-                      )}
-
-                      <div className="p-6 flex flex-col flex-1">
-                        {!hasImage && hasDiscount && (
-                          <div className="mb-4 self-start px-3 py-1.5 rounded-full bg-gradient-to-r from-red-600 to-red-500 text-white text-[11px] font-black shadow-xl">
-                            عرض خاص {discountPercent}% خصم
+                  <div key={product.id} className="group bg-[#141414] border border-white/5 rounded-xl overflow-hidden hover:border-[#D4AF37]/30 transition-all flex flex-col">
+                    {hasImage && (
+                      <div className="relative bg-white h-[150px] md:h-[165px] flex items-center justify-center p-2 overflow-hidden">
+                        <img src={product.image_url} alt={product.name} className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                        {hasDiscount && (
+                          <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-[#CC0C39] text-white text-[10px] font-bold">
+                            -{discountPercent}%
                           </div>
                         )}
-                        <h3 className="font-bold text-[17px] group-hover:text-[#D4AF37] transition-colors">{product.name}</h3>
-                        <p className="text-white/60 text-[13px] mt-3 leading-7 whitespace-pre-wrap break-words">
-                          {product.description || 'منتج حصري من متاجر سوق فاقوس الرسمية'}
-                        </p>
-                        <div className="flex items-end justify-between mt-6 mb-5">
-                          <div><div className="text-white/20 text-[11px] tracking-widest">السعر</div><div className="flex items-baseline gap-2"><div className="flex items-baseline gap-1 text-[#D4AF37] font-black text-2xl">{product.price}<span className="text-xs font-bold">ج.م</span></div>{product.old_price && <span className="text-white/20 line-through text-xs">{product.old_price} ج.م</span>}</div></div>
-                          <div className="text-[11px] px-2.5 py-1 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/20 text-[#D4AF37]">{product.stock} متاح</div>
-                        </div>
-                        <button onClick={() => addToCart(product)} disabled={product.stock === 0} className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#D4AF37] to-[#FFD700] text-black font-black tracking-wide hover:shadow-[0_0_30px_rgba(212,175,55,0.6)] transition-all flex items-center justify-center gap-2 disabled:opacity-20"><ShoppingCart size={18} />إضافة للسلة</button>
                       </div>
+                    )}
+                    <div className="p-2.5 flex flex-col flex-1">
+                      {!hasImage && hasDiscount && (
+                        <div className="mb-2 self-start px-2 py-0.5 rounded bg-[#CC0C39] text-white text-[10px] font-bold">
+                          خصم {discountPercent}%
+                        </div>
+                      )}
+                      <h3 className="font-medium text-[13px] leading-[1.3] line-clamp-2 min-h-[34px] group-hover:text-[#D4AF37] transition-colors">{product.name}</h3>
+                      <p className="text-white/40 text-[11px] mt-1 leading-4 whitespace-pre-wrap break-words line-clamp-2">
+                        {product.description || ''}
+                      </p>
+                      <div className="flex items-baseline gap-1 mt-2">
+                        <div className="font-bold text-[15px] text-white">{product.price}</div>
+                        <span className="text-[11px] text-white/50">ج.م</span>
+                        {product.old_price && <span className="text-white/30 line-through text-[10px] mr-1">{product.old_price}</span>}
+                      </div>
+                      <button onClick={() => addToCart(product)} disabled={product.stock === 0} className="w-full mt-3 h-8 rounded-full bg-[#FFD814] hover:bg-[#F7CA00] text-black font-bold text-[12px] transition flex items-center justify-center gap-1 disabled:opacity-20"><ShoppingCart size={12} />أضف</button>
                     </div>
                   </div>
                 )
@@ -281,44 +278,40 @@ export default function ShopPage() {
             <p className="text-white/40 text-sm mt-2">صاحب المحل لم يضف منتجات بعد</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          /* ✅ تعديل امازون - كروت صغيرة فقط */
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-3">
             {products.map((product) => {
               const discountPercent = getDiscountPercent(product)
               const hasDiscount = discountPercent > 0
               const hasImage =!!product.image_url
               return (
-                <div
-                  key={product.id}
-                  className="bg-[#1E1E1E] border border-[#333] rounded-3xl overflow-hidden hover:border-[#D4AF37]/30 transition-all hover:scale-[1.02] flex flex-col"
-                >
+                <div key={product.id} className="bg-[#1E1E1E] border border-[#333] rounded-xl overflow-hidden hover:border-[#D4AF37]/30 transition-all flex flex-col group">
                   {hasImage && (
-                    <div className="relative w-full aspect-square overflow-hidden bg-black flex items-center justify-center">
-                      <img src={product.image_url} alt={product.name} className="w-full h-full object-contain" loading="lazy" />
+                    <div className="relative bg-white h-[150px] md:h-[165px] flex items-center justify-center p-2 overflow-hidden">
+                      <img src={product.image_url} alt={product.name} className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform" loading="lazy" />
                       {hasDiscount && (
-                        <span className="absolute top-3 right-3 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full">
-                          عرض خاص {discountPercent}% خصم
+                        <span className="absolute top-1.5 right-1.5 bg-[#CC0C39] text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
+                          -{discountPercent}%
                         </span>
                       )}
                     </div>
                   )}
-                  <div className="p-5 flex flex-col flex-1">
+                  <div className="p-2.5 flex flex-col flex-1">
                     {!hasImage && hasDiscount && (
-                      <span className="mb-3 self-start bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full">
-                        عرض خاص {discountPercent}% خصم
+                      <span className="mb-2 self-start bg-[#CC0C39] text-white text-[10px] font-bold px-2 py-0.5 rounded">
+                        خصم {discountPercent}%
                       </span>
                     )}
-                    <h3 className="text-lg font-bold text-white mb-1">{product.name}</h3>
-                    <p className="text-white/60 text-sm mb-4 whitespace-pre-wrap break-words leading-6">
-                      {product.description || 'لا يوجد وصف'}
+                    <h3 className="text-[13px] font-medium leading-[1.3] line-clamp-2 min-h-[34px]">{product.name}</h3>
+                    <p className="text-white/40 text-[11px] mt-1 whitespace-pre-wrap break-words line-clamp-2 leading-4">
+                      {product.description || ''}
                     </p>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1 text-[#D4AF37] font-bold text-2xl"><span>{product.price}</span><span className="text-sm">ج.م</span></div>
-                        {product.old_price && <span className="text-white/30 line-through text-sm">{product.old_price} ج.م</span>}
-                      </div>
-                      <div className="text-white/40 text-sm">{product.stock} متاح</div>
+                    <div className="flex items-baseline gap-1 mt-2">
+                      <span className="font-bold text-[15px] text-[#D4AF37]">{product.price}</span>
+                      <span className="text-[11px]">ج.م</span>
+                      {product.old_price && <span className="text-white/30 line-through text-[10px] mr-1">{product.old_price}</span>}
                     </div>
-                    <button onClick={() => addToCart(product)} disabled={product.stock === 0} className="w-full mt-auto px-4 py-3 rounded-xl bg-[#D4AF37] text-black font-bold hover:bg-[#D4AF37]/90 transition flex items-center justify-center gap-2"><ShoppingCart size={18} />أضف للسلة</button>
+                    <button onClick={() => addToCart(product)} disabled={product.stock === 0} className="w-full mt-3 h-8 rounded-full bg-[#D4AF37] text-black font-bold text-[12px] hover:bg-[#D4AF37]/90 transition flex items-center justify-center gap-1"><ShoppingCart size={12} />أضف</button>
                   </div>
                 </div>
               );
