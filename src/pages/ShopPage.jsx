@@ -20,11 +20,11 @@ export default function ShopPage() {
       setError(null)
 
       const { data: shopData, error: shopError } = await supabase
-.from('shops')
-.select('*, categories(name, icon)')
-.eq('id', id)
-.eq('is_active', true)
-.single()
+       .from('shops')
+       .select('*, categories(name, icon)')
+       .eq('id', id)
+       .eq('is_active', true)
+       .single()
 
       if (shopError) throw new Error('المحل غير موجود')
       if (!shopData) throw new Error('المحل غير موجود')
@@ -32,11 +32,11 @@ export default function ShopPage() {
       setShop(shopData)
 
       const { data: productsData, error: productsError } = await supabase
-.from('products')
-.select('*')
-.eq('shop_id', id)
-.eq('is_active', true)
-.order('created_at', { ascending: false })
+       .from('products')
+       .select('*')
+       .eq('shop_id', id)
+       .eq('is_active', true)
+       .order('created_at', { ascending: false })
 
       if (productsError) throw productsError
 
@@ -75,7 +75,6 @@ export default function ShopPage() {
     alert('تم إضافة المنتج للسلة ✅')
   }
 
-  // ✅ حساب نسبة الخصم
   function getDiscountPercent(product) {
     if (product.discount_percent && product.discount_percent > 0) return product.discount_percent
     if (product.old_price && parseFloat(product.old_price) > parseFloat(product.price)) {
@@ -110,7 +109,6 @@ export default function ShopPage() {
     )
   }
 
-  // ✅🔥 متاجر سوق فاقوس الرسمية فقط - تصميم ULTRA LUXURY
   if (shop.is_souq_faqous_shop) {
     return (
       <div className="min-h-screen bg-[#050505] text-white pb-20 relative overflow-hidden" dir="rtl">
@@ -176,21 +174,33 @@ export default function ShopPage() {
               {products.map((product) => {
                 const discountPercent = getDiscountPercent(product)
                 const hasDiscount = discountPercent > 0
+                const hasImage =!!product.image_url
                 return (
                   <div key={product.id} className="group relative rounded-[2rem] p-[1px] bg-gradient-to-br from-white/10 via-white/[0.02] to-transparent hover:from-[#D4AF37]/50 hover:via-[#D4AF37]/10 hover:to-transparent transition-all duration-700 hover:-translate-y-2">
                     <div className="relative bg-gradient-to-br from-[#141414] to-[#0a0a0a] rounded-[2rem] overflow-hidden flex flex-col h-full">
-                      <div className="relative aspect-square bg-[#080808] overflow-hidden">
-                        <img src={product.image_url} alt={product.name} className="w-full h-full object-contain p-4 group-hover:scale-110 transition-transform duration-1000" loading="lazy" />
-                        {hasDiscount && (
-                          <div className="absolute top-4 right-4 px-3 py-2 rounded-full bg-gradient-to-r from-red-600 to-red-500 text-white text-[11px] font-black shadow-xl">
+
+                      {hasImage && (
+                        <div className="relative aspect-square bg-[#080808] overflow-hidden">
+                          <img src={product.image_url} alt={product.name} className="w-full h-full object-contain p-4 group-hover:scale-110 transition-transform duration-1000" loading="lazy" />
+                          {hasDiscount && (
+                            <div className="absolute top-4 right-4 px-3 py-2 rounded-full bg-gradient-to-r from-red-600 to-red-500 text-white text-[11px] font-black shadow-xl">
+                              عرض خاص {discountPercent}% خصم
+                            </div>
+                          )}
+                          <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[#141414] to-transparent"></div>
+                        </div>
+                      )}
+
+                      <div className="p-6 flex flex-col flex-1">
+                        {!hasImage && hasDiscount && (
+                          <div className="mb-4 self-start px-3 py-1.5 rounded-full bg-gradient-to-r from-red-600 to-red-500 text-white text-[11px] font-black shadow-xl">
                             عرض خاص {discountPercent}% خصم
                           </div>
                         )}
-                        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[#141414] to-transparent"></div>
-                      </div>
-                      <div className="p-6 flex flex-col flex-1">
                         <h3 className="font-bold text-[17px] group-hover:text-[#D4AF37] transition-colors">{product.name}</h3>
-                        <p className="text-white/30 text-xs mt-2 line-clamp-2 h-8 leading-relaxed">{product.description || 'منتج حصري من متاجر سوق فاقوس الرسمية'}</p>
+                        <p className="text-white/60 text-[13px] mt-3 leading-7 whitespace-pre-wrap break-words">
+                          {product.description || 'منتج حصري من متاجر سوق فاقوس الرسمية'}
+                        </p>
                         <div className="flex items-end justify-between mt-6 mb-5">
                           <div><div className="text-white/20 text-[11px] tracking-widest">السعر</div><div className="flex items-baseline gap-2"><div className="flex items-baseline gap-1 text-[#D4AF37] font-black text-2xl">{product.price}<span className="text-xs font-bold">ج.م</span></div>{product.old_price && <span className="text-white/20 line-through text-xs">{product.old_price} ج.م</span>}</div></div>
                           <div className="text-[11px] px-2.5 py-1 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/20 text-[#D4AF37]">{product.stock} متاح</div>
@@ -275,22 +285,32 @@ export default function ShopPage() {
             {products.map((product) => {
               const discountPercent = getDiscountPercent(product)
               const hasDiscount = discountPercent > 0
+              const hasImage =!!product.image_url
               return (
                 <div
                   key={product.id}
                   className="bg-[#1E1E1E] border border-[#333] rounded-3xl overflow-hidden hover:border-[#D4AF37]/30 transition-all hover:scale-[1.02] flex flex-col"
                 >
-                  <div className="relative w-full aspect-square overflow-hidden bg-black flex items-center justify-center">
-                    <img src={product.image_url} alt={product.name} className="w-full h-full object-contain" loading="lazy" />
-                    {hasDiscount && (
-                      <span className="absolute top-3 right-3 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+                  {hasImage && (
+                    <div className="relative w-full aspect-square overflow-hidden bg-black flex items-center justify-center">
+                      <img src={product.image_url} alt={product.name} className="w-full h-full object-contain" loading="lazy" />
+                      {hasDiscount && (
+                        <span className="absolute top-3 right-3 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+                          عرض خاص {discountPercent}% خصم
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <div className="p-5 flex flex-col flex-1">
+                    {!hasImage && hasDiscount && (
+                      <span className="mb-3 self-start bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full">
                         عرض خاص {discountPercent}% خصم
                       </span>
                     )}
-                  </div>
-                  <div className="p-5 flex flex-col flex-1">
-                    <h3 className="text-lg font-bold text-white mb-1 line-clamp-1">{product.name}</h3>
-                    <p className="text-white/50 text-sm mb-4 line-clamp-2 h-10">{product.description || 'لا يوجد وصف'}</p>
+                    <h3 className="text-lg font-bold text-white mb-1">{product.name}</h3>
+                    <p className="text-white/60 text-sm mb-4 whitespace-pre-wrap break-words leading-6">
+                      {product.description || 'لا يوجد وصف'}
+                    </p>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <div className="flex items-center gap-1 text-[#D4AF37] font-bold text-2xl"><span>{product.price}</span><span className="text-sm">ج.م</span></div>
